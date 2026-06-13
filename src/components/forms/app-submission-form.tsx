@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useRef } from "react";
+import { useActionState, useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, Info, Upload, X, CheckCircle, FileText, Image as ImageIcon,
@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { submitAppAction } from "@/lib/actions/apps";
-import { uploadFileAction } from "@/lib/actions/upload";
+import { uploadFileDirect } from "@/lib/utils/upload-client";
+import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types";
 
 const PLANS = [
@@ -171,12 +172,22 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
   const [selectedPlan, setSelectedPlan] = useState<"basic" | "priority" | "featured">(defaultPlan);
   const [state, formAction, pending] = useActionState(submitAppAction, {});
 
+  // Get current user ID for upload paths
+  const [userId, setUserId] = useState("");
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUserId(data.user.id);
+    });
+  }, []);
+
   // File upload state
   const [apkUrl, setApkUrl] = useState("");
   const [apkPath, setApkPath] = useState("");
   const [apkName, setApkName] = useState("");
   const [apkUploading, setApkUploading] = useState(false);
   const [apkError, setApkError] = useState("");
+  const [apkProgress, setApkProgress] = useState(0);
 
   const [iconUrl, setIconUrl] = useState("");
   const [iconUploading, setIconUploading] = useState(false);
@@ -190,13 +201,15 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
   const [screenshots, setScreenshots] = useState<{ url: string; name: string }[]>([]);
   const [ssUploading, setSsUploading] = useState(false);
 
+  // Direct browser → Supabase upload (no server middleman = fast)
   const uploadApk = async (file: File) => {
     setApkUploading(true);
     setApkError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    const result = await uploadFileAction(fd, "app-apks");
+    setApkProgress(10);
+    const result = await uploadFileDirect(file, "app-apks", userId);
+    setApkProgress(100);
     setApkUploading(false);
+    setApkProgress(0);
     if (result.error) { setApkError(result.error); return; }
     setApkUrl(result.url!);
     setApkPath(result.path!);
@@ -206,9 +219,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
   const uploadIcon = async (file: File) => {
     setIconUploading(true);
     setIconError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    const result = await uploadFileAction(fd, "app-icons");
+    const result = await uploadFileDirect(file, "app-icons", userId);
     setIconUploading(false);
     if (result.error) { setIconError(result.error); return; }
     setIconUrl(result.url!);
@@ -217,9 +228,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
 
   const uploadBanner = async (file: File) => {
     setBannerUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const result = await uploadFileAction(fd, "app-banners");
+    const result = await uploadFileDirect(file, "app-banners", userId);
     setBannerUploading(false);
     if (result.error) return;
     setBannerUrl(result.url!);
@@ -228,9 +237,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
 
   const addScreenshot = async (file: File) => {
     setSsUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const result = await uploadFileAction(fd, "app-screenshots");
+    const result = await uploadFileDirect(file, "app-screenshots", userId);
     setSsUploading(false);
     if (result.error) return;
     setScreenshots((prev) => [...prev, { url: result.url!, name: file.name }]);
@@ -316,14 +323,27 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin =
             <FileUploadZone
               label="APK File *"
               accept=".apk"
-              hint=".apk only · max 150 MB"
+              hint=".apk only · max 150 MB · uploads directly to storage"
               onUpload={uploadApk}
               uploading={apkUploading}
               uploadedUrl={apkUrl}
               fileName={apkName}
             />
+            {apkUploading && apkProgress > 0 && (
+              <div className="mt-2">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300 animate-pulse"
+                    style={{ width: `${apkProgress}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-primary">Uploading directly to storage...</p>
+              </div>
+            )}
             {apkError && <p className="mt-1 text-xs text-red-400">{apkError}</p>}
-            {!apkUrl && <p className="mt-1 text-xs text-secondary-500">APK is required before submitting</p>}
+            {!apkUrl && !apkUploading && (
+              <p className="mt-1 text-xs text-secondary-500">APK required · uploads go directly from your browser to storage (fast)</p>
+            )}
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
