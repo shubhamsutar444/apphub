@@ -1,84 +1,120 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { signupAction, type AuthActionState } from "@/lib/actions/auth";
-import { signupSchema, type SignupInput } from "@/lib/validations/auth";
+import { createClient } from "@/lib/supabase/client";
 import { ROUTES } from "@/lib/constants/routes";
-import { cn } from "@/lib/utils/cn";
-
-const initialState: AuthActionState = {};
 
 export function SignupForm() {
-  const [state, formAction, pending] = useActionState(signupAction, initialState);
+  const router = useRouter();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    formState: { errors },
-  } = useForm<SignupInput>({
-    resolver: zodResolver(signupSchema),
-  });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (fullName.trim().length < 2) {
+      setError("Name must be at least 2 characters");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must include at least one uppercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError("Password must include at least one number");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+
+      const { error: authError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim() },
+          emailRedirectTo: `${appUrl}/auth/callback?next=/dashboard/user`,
+        },
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/verify-email?email=" + encodeURIComponent(email.trim()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.");
+      setLoading(false);
+    }
+  };
 
   return (
-    <form action={formAction} className="mt-8 space-y-4">
-      {(state.error ||
-        errors.fullName?.message ||
-        errors.email?.message ||
-        errors.password?.message ||
-        errors.confirmPassword?.message) && (
+    <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+      {error && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          {state.error ??
-            errors.fullName?.message ??
-            errors.email?.message ??
-            errors.password?.message ??
-            errors.confirmPassword?.message}
+          {error}
         </div>
       )}
 
       <div>
-        <label htmlFor="fullName" className="mb-2 block text-sm font-medium">
-          Full Name
-        </label>
+        <label htmlFor="fullName" className="mb-2 block text-sm font-medium">Full Name</label>
         <Input
           id="fullName"
           type="text"
           placeholder="John Doe"
           autoComplete="name"
-          {...register("fullName")}
-          className={cn(errors.fullName && "border-red-500/50")}
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          required
         />
       </div>
 
       <div>
-        <label htmlFor="email" className="mb-2 block text-sm font-medium">
-          Email
-        </label>
+        <label htmlFor="email" className="mb-2 block text-sm font-medium">Email</label>
         <Input
           id="email"
           type="email"
           placeholder="you@example.com"
           autoComplete="email"
-          {...register("email")}
-          className={cn(errors.email && "border-red-500/50")}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="mb-2 block text-sm font-medium">
-          Password
-        </label>
+        <label htmlFor="password" className="mb-2 block text-sm font-medium">Password</label>
         <Input
           id="password"
           type="password"
           placeholder="••••••••"
           autoComplete="new-password"
-          {...register("password")}
-          className={cn(errors.password && "border-red-500/50")}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
         />
       </div>
 
@@ -91,17 +127,15 @@ export function SignupForm() {
           type="password"
           placeholder="••••••••"
           autoComplete="new-password"
-          {...register("confirmPassword")}
-          className={cn(errors.confirmPassword && "border-red-500/50")}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Creating account...
-          </>
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Creating account...</>
         ) : (
           "Create Account"
         )}
