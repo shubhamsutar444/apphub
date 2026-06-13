@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Variables ─────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --primary:    137 233 0;     /* #89E900 kiwi */
+    --background: 14 14 14;     /* #0E0E0E night */
+    --foreground: 245 245 245;  /* #F5F5F5 */
+    --muted:      102 102 102;  /* #666666 */
+    --border:     42  42  42;   /* #2A2A2A */
+    --card:       26  26  26;   /* #1A1A1A */
+  }
+
+  /* ── Reset & Base ───────────────────────────────────────────────────── */
+  * {
+    @apply border-night-700/30;
+  }
+
+  html {
+    @apply scroll-smooth antialiased;
+  }
+
+  body {
+    background-color: #0E0E0E;
+    color: #F0F0F0;
+    font-family: var(--font-body), Inter, system-ui, sans-serif;
+  }
+
+  /* ── Heading font everywhere h1–h6 ─────────────────────────────────── */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading), "Space Grotesk", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Selection color ──────────────────────────────────────────────── */
+  ::selection {
+    background-color: rgba(137, 233, 0, 0.30);
+    color: #ffffff;
+  }
+
+  /* ── Custom scrollbar ─────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #141414; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(137, 233, 0, 0.30);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(137, 233, 0, 0.55);
+  }
+}
+
+/* ─── Component Classes ─────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Glass surface (Night-tinted, kiwi-bordered) ─────────────────── */
+  .glass {
+    background: rgba(26, 26, 26, 0.70);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(137, 233, 0, 0.10);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.40);
+  }
+
+  .glass-card {
+    @apply glass rounded-2xl p-6 transition-all duration-300;
+  }
+
+  .glass-card-hover {
+    @apply glass-card;
+    &:hover {
+      border-color: rgba(137, 233, 0, 0.30);
+      box-shadow: 0 12px 40px rgba(137, 233, 0, 0.14);
+      transform: translateY(-2px);
+    }
+  }
+
+  /* ── Page background ─────────────────────────────────────────────── */
+  .gradient-bg {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(137,233,0,0.14), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 90% 10%, rgba(190,255,78,0.06), transparent 50%),
+      linear-gradient(to bottom, #0E0E0E, #181818, #0E0E0E);
+    min-height: 100vh;
+  }
+
+  /* ── Text gradient (kiwi) ────────────────────────────────────────── */
+  .text-gradient {
+    background: linear-gradient(135deg, #89E900 0%, #BEFF4E 50%, #89E900 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-white {
+    background: linear-gradient(135deg, #ffffff 0%, #BEFF4E 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+           transition-all duration-200 active:scale-[0.97] select-none;
+    background: #89E900;
+    color: #111111;
+    padding: 0.75rem 1.75rem;
+    font-size: 0.9rem;
+    font-family: var(--font-heading);
+    box-shadow: 0 0 28px rgba(137,233,0,0.25);
+    &:hover {
+      background: #9DFF00;
+      box-shadow: 0 0 40px rgba(137,233,0,0.40);
+      transform: translateY(-1px);
+    }
+    &:disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+           transition-all duration-200 active:scale-[0.97] select-none;
+    border: 1px solid rgba(137,233,0,0.25);
+    background: rgba(137,233,0,0.06);
+    color: #d4f55a;
+    padding: 0.75rem 1.75rem;
+    font-size: 0.9rem;
+    font-family: var(--font-heading);
+    &:hover {
+      border-color: rgba(137,233,0,0.55);
+      background: rgba(137,233,0,0.12);
+      color: #89E900;
+      transform: translateY(-1px);
+    }
+    &:disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2
+           text-sm font-medium transition-colors;
+    color: #888888;
+    &:hover {
+      background: rgba(137,233,0,0.07);
+      color: #89E900;
+    }
+  }
+
+  /* ── Input fields ────────────────────────────────────────────────── */
+  .input-field {
+    @apply w-full rounded-xl px-4 py-3 text-sm transition-all
+           focus:outline-none;
+    background: rgba(26, 26, 26, 0.80);
+    border: 1px solid rgba(137, 233, 0, 0.12);
+    color: #F0F0F0;
+    font-family: var(--font-body);
+    &::placeholder { color: #555555; }
+    &:focus {
+      border-color: rgba(137,233,0,0.50);
+      box-shadow: 0 0 0 3px rgba(137,233,0,0.08);
+    }
+  }
+
+  /* ── Section container ───────────────────────────────────────────── */
+  .section-container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* ── Skeleton ────────────────────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(137,233,0,0.06) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+    border-radius: 0.5rem;
+  }
+
+  /* ── Kiwi badge / pill ───────────────────────────────────────────── */
+  .badge-kiwi {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold;
+    background: rgba(137,233,0,0.14);
+    color: #89E900;
+    border: 1px solid rgba(137,233,0,0.25);
+    font-family: var(--font-heading);
+  }
+
+  /* ── Neon divider ────────────────────────────────────────────────── */
+  .divider-kiwi {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(137,233,0,0.35), transparent);
+  }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .font-heading {
+    font-family: var(--font-heading), "Space Grotesk", system-ui, sans-serif;
+  }
+
+  .font-body {
+    font-family: var(--font-body), Inter, system-ui, sans-serif;
+  }
+
+  /* Glow ring utility */
+  .ring-kiwi {
+    box-shadow: 0 0 0 2px rgba(137,233,0,0.35);
+  }
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-14px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(137,233,0,0.20); }
+  50%       { box-shadow: 0 0 50px rgba(137,233,0,0.50); }
+}

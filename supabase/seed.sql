@@ -1,0 +1,2 @@
+-- Run after migrations. Categories are seeded in 009_seed_categories.sql.
+-- Admin bootstrap: use `npm run bootstrap-admin` after first signup with ADMIN_EMAIL.

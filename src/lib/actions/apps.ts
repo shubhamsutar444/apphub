@@ -1,0 +1,583 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { appSubmissionSchema, reviewSchema } from "@/lib/validations/app";
+import { getCurrentUser } from "@/lib/auth/session";
+import type { AppStatus } from "@/types";
+
+export type AppActionState = {
+  error?: string;
+  success?: string;
+  appId?: string;
+};
+
+// ─── Developer Actions ───────────────────────────────────────────────────────
+
+export async function submitAppAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || (user.profile.role !== "developer" && user.profile.role !== "admin")) {
+    return { error: "You must be a developer to submit apps" };
+  }
+
+  const parsed = appSubmissionSchema.safeParse({
+    name: formData.get("name"),
+    short_description: formData.get("short_description"),
+    full_description: formData.get("full_description"),
+    category_id: formData.get("category_id"),
+    version: formData.get("version"),
+    developer_website: formData.get("developer_website") || undefined,
+    privacy_policy_url: formData.get("privacy_policy_url") || undefined,
+    support_email: formData.get("support_email") || undefined,
+    tags: formData.get("tags") || undefined,
+    publishing_plan: formData.get("publishing_plan"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+
+  // Get developer profile
+  const { data: developer, error: devError } = await supabase
+    .from("developers")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (devError || !developer) {
+    return { error: "Developer profile not found. Please set up your developer profile first." };
+  }
+
+  const slug = parsed.data.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    + "-" + Date.now().toString(36);
+
+  const tagsArray = parsed.data.tags
+    ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  // Collect uploaded file URLs from form
+  const iconUrl = formData.get("icon_url")?.toString() || null;
+  const bannerUrl = formData.get("banner_url")?.toString() || null;
+  const apkUrl = formData.get("apk_url")?.toString() || null;
+  const screenshotsRaw = formData.get("screenshots")?.toString() || "[]";
+  let screenshotUrls: string[] = [];
+  try { screenshotUrls = JSON.parse(screenshotsRaw); } catch { screenshotUrls = []; }
+
+  const { data: app, error } = await supabase
+    .from("applications")
+    .insert({
+      developer_id: developer.id,
+      name: parsed.data.name,
+      slug,
+      short_description: parsed.data.short_description,
+      full_description: parsed.data.full_description,
+      category_id: parsed.data.category_id,
+      current_version: parsed.data.version,
+      developer_website: parsed.data.developer_website || null,
+      privacy_policy_url: parsed.data.privacy_policy_url || null,
+      support_email: parsed.data.support_email || null,
+      tags: tagsArray,
+      publishing_plan: parsed.data.publishing_plan,
+      icon_url: iconUrl,
+      banner_url: bannerUrl,
+      status: "pending_review",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  // Save APK version record
+  if (apkUrl) {
+    await supabase.from("application_versions").insert({
+      application_id: app.id,
+      version: parsed.data.version,
+      apk_path: apkUrl,
+      apk_size_bytes: 0,
+      is_active: true,
+    });
+  }
+
+  // Save screenshots
+  if (screenshotUrls.length > 0) {
+    await supabase.from("application_screenshots").insert(
+      screenshotUrls.map((url, i) => ({
+        application_id: app.id,
+        url,
+        sort_order: i,
+      }))
+    );
+  }
+
+  // Create payment record
+  const planPrices = { basic: 9900, priority: 29900, featured: 99900 };
+  await supabase.from("payments").insert({
+    user_id: user.id,
+    application_id: app.id,
+    plan: parsed.data.publishing_plan,
+    amount_paise: planPrices[parsed.data.publishing_plan],
+    status: "pending",
+  });
+
+  // Notify admins
+  const adminClient = createAdminClient();
+  const { data: admins } = await adminClient
+    .from("users")
+    .select("id")
+    .eq("role", "admin");
+
+  if (admins && admins.length > 0) {
+    await adminClient.from("notifications").insert(
+      admins.map((admin) => ({
+        user_id: admin.id,
+        type: "new_submission" as const,
+        title: "New App Submission",
+        body: `${parsed.data.name} has been submitted for review.`,
+        link: `/dashboard/admin/apps`,
+        metadata: { app_id: app.id },
+      }))
+    );
+  }
+
+  revalidatePath("/dashboard/developer/apps");
+  redirect(`/dashboard/developer/apps`);
+}
+
+export async function updateAppAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const appId = formData.get("app_id")?.toString();
+  if (!appId) return { error: "App ID required" };
+
+  const parsed = appSubmissionSchema.omit({ publishing_plan: true }).safeParse({
+    name: formData.get("name"),
+    short_description: formData.get("short_description"),
+    full_description: formData.get("full_description"),
+    category_id: formData.get("category_id"),
+    version: formData.get("version"),
+    developer_website: formData.get("developer_website") || undefined,
+    privacy_policy_url: formData.get("privacy_policy_url") || undefined,
+    support_email: formData.get("support_email") || undefined,
+    tags: formData.get("tags") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const tagsArray = parsed.data.tags
+    ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  const { error } = await supabase
+    .from("applications")
+    .update({
+      name: parsed.data.name,
+      short_description: parsed.data.short_description,
+      full_description: parsed.data.full_description,
+      category_id: parsed.data.category_id,
+      current_version: parsed.data.version,
+      developer_website: parsed.data.developer_website || null,
+      privacy_policy_url: parsed.data.privacy_policy_url || null,
+      support_email: parsed.data.support_email || null,
+      tags: tagsArray,
+    })
+    .eq("id", appId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/developer/apps");
+  return { success: "App updated successfully" };
+}
+
+export async function deleteAppAction(appId: string): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("applications")
+    .delete()
+    .eq("id", appId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/developer/apps");
+  return { success: "App deleted" };
+}
+
+export async function createDeveloperProfileAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const displayName = formData.get("display_name")?.toString()?.trim();
+  const bio = formData.get("bio")?.toString()?.trim();
+  const website = formData.get("website")?.toString()?.trim();
+  const supportEmail = formData.get("support_email")?.toString()?.trim();
+
+  if (!displayName || displayName.length < 2) {
+    return { error: "Display name must be at least 2 characters" };
+  }
+
+  const slug = displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    + "-" + Date.now().toString(36);
+
+  const supabase = await createClient();
+
+  // Check if already exists
+  const { data: existing } = await supabase
+    .from("developers")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("developers")
+      .update({
+        display_name: displayName,
+        bio: bio || null,
+        website: website || null,
+        support_email: supportEmail || null,
+      })
+      .eq("user_id", user.id);
+
+    if (error) return { error: error.message };
+    revalidatePath("/dashboard/developer");
+    return { success: "Profile updated" };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Create developer profile
+  const { error: devError } = await adminClient
+    .from("developers")
+    .insert({
+      user_id: user.id,
+      display_name: displayName,
+      slug,
+      bio: bio || null,
+      website: website || null,
+      support_email: supportEmail || null,
+    });
+
+  if (devError) return { error: devError.message };
+
+  // Upgrade user role
+  const { error: roleError } = await adminClient
+    .from("users")
+    .update({ role: "developer" })
+    .eq("id", user.id);
+
+  if (roleError) return { error: roleError.message };
+
+  revalidatePath("/dashboard/developer");
+  redirect("/dashboard/developer");
+}
+
+// ─── Admin Actions ────────────────────────────────────────────────────────────
+
+export async function approveAppAction(appId: string): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const adminClient = createAdminClient();
+
+  const { data: app, error: fetchError } = await adminClient
+    .from("applications")
+    .update({
+      status: "approved",
+      published_at: new Date().toISOString(),
+      rejection_reason: null,
+    })
+    .eq("id", appId)
+    .select("name, developer_id")
+    .single();
+
+  if (fetchError || !app) return { error: fetchError?.message ?? "App not found" };
+
+  // Get developer user_id
+  const { data: dev } = await adminClient
+    .from("developers")
+    .select("user_id")
+    .eq("id", app.developer_id)
+    .single();
+
+  if (dev) {
+    await adminClient.from("notifications").insert({
+      user_id: dev.user_id,
+      type: "app_approved",
+      title: "App Approved! 🎉",
+      body: `Your app "${app.name}" has been approved and is now live on AppHub.`,
+      link: `/dashboard/developer/apps`,
+      metadata: { app_id: appId },
+    });
+  }
+
+  revalidatePath("/dashboard/admin/apps");
+  return { success: "App approved and published" };
+}
+
+export async function rejectAppAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const appId = formData.get("app_id")?.toString();
+  const reason = formData.get("reason")?.toString();
+
+  if (!appId) return { error: "App ID required" };
+  if (!reason || reason.length < 10) return { error: "Please provide a detailed rejection reason (min 10 characters)" };
+
+  const adminClient = createAdminClient();
+
+  const { data: app, error } = await adminClient
+    .from("applications")
+    .update({ status: "rejected", rejection_reason: reason })
+    .eq("id", appId)
+    .select("name, developer_id")
+    .single();
+
+  if (error || !app) return { error: error?.message ?? "App not found" };
+
+  const { data: dev } = await adminClient
+    .from("developers")
+    .select("user_id")
+    .eq("id", app.developer_id)
+    .single();
+
+  if (dev) {
+    await adminClient.from("notifications").insert({
+      user_id: dev.user_id,
+      type: "app_rejected",
+      title: "App Rejected",
+      body: `Your app "${app.name}" was rejected. Reason: ${reason}`,
+      link: `/dashboard/developer/apps`,
+      metadata: { app_id: appId },
+    });
+  }
+
+  revalidatePath("/dashboard/admin/apps");
+  return { success: "App rejected" };
+}
+
+export async function requestChangesAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const appId = formData.get("app_id")?.toString();
+  const notes = formData.get("notes")?.toString();
+
+  if (!appId || !notes) return { error: "App ID and notes required" };
+
+  const adminClient = createAdminClient();
+
+  const { data: app, error } = await adminClient
+    .from("applications")
+    .update({ status: "changes_requested", admin_notes: notes })
+    .eq("id", appId)
+    .select("name, developer_id")
+    .single();
+
+  if (error || !app) return { error: error?.message ?? "App not found" };
+
+  const { data: dev } = await adminClient
+    .from("developers")
+    .select("user_id")
+    .eq("id", app.developer_id)
+    .single();
+
+  if (dev) {
+    await adminClient.from("notifications").insert({
+      user_id: dev.user_id,
+      type: "changes_requested",
+      title: "Changes Requested",
+      body: `Admin has requested changes to "${app.name}": ${notes}`,
+      link: `/dashboard/developer/apps`,
+      metadata: { app_id: appId },
+    });
+  }
+
+  revalidatePath("/dashboard/admin/apps");
+  return { success: "Changes requested" };
+}
+
+export async function featureAppAction(appId: string, featured: boolean): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("applications")
+    .update({ is_featured: featured })
+    .eq("id", appId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/admin/apps");
+  revalidatePath("/");
+  return { success: featured ? "App featured" : "App unfeatured" };
+}
+
+export async function adminPublishAppAction(appId: string): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("applications")
+    .update({ status: "approved", published_at: new Date().toISOString() })
+    .eq("id", appId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/admin/apps");
+  return { success: "App published instantly" };
+}
+
+export async function changeAppStatusAction(appId: string, status: AppStatus): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user || user.profile.role !== "admin") return { error: "Unauthorized" };
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("applications")
+    .update({ status })
+    .eq("id", appId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/admin/apps");
+  return { success: `App status changed to ${status}` };
+}
+
+// ─── User Actions ─────────────────────────────────────────────────────────────
+
+export async function submitReviewAction(
+  _prevState: AppActionState,
+  formData: FormData
+): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You must be signed in to leave a review" };
+
+  const appId = formData.get("application_id")?.toString();
+  if (!appId) return { error: "App ID required" };
+
+  const parsed = reviewSchema.safeParse({
+    rating: parseInt(formData.get("rating")?.toString() ?? "0"),
+    title: formData.get("title")?.toString() || undefined,
+    body: formData.get("body")?.toString() || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("reviews")
+    .upsert({
+      application_id: appId,
+      user_id: user.id,
+      rating: parsed.data.rating,
+      title: parsed.data.title || null,
+      body: parsed.data.body || null,
+    });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/apps/${appId}`);
+  return { success: "Review submitted" };
+}
+
+export async function toggleFavoriteAction(appId: string): Promise<AppActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You must be signed in" };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("favorites")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("application_id", appId)
+    .single();
+
+  if (existing) {
+    await supabase.from("favorites").delete().eq("id", existing.id);
+    revalidatePath(`/apps/${appId}`);
+    return { success: "Removed from favorites" };
+  }
+
+  await supabase.from("favorites").insert({ user_id: user.id, application_id: appId });
+  revalidatePath(`/apps/${appId}`);
+  return { success: "Added to favorites" };
+}
+
+export async function recordDownloadAction(appId: string, versionId?: string): Promise<void> {
+  const user = await getCurrentUser();
+  const supabase = await createClient();
+
+  await supabase.from("downloads").insert({
+    application_id: appId,
+    user_id: user?.id || null,
+    version_id: versionId || null,
+  });
+
+  revalidatePath(`/apps/${appId}`);
+}
+
+export async function markNotificationReadAction(notificationId: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("id", notificationId)
+    .eq("user_id", user.id);
+
+  revalidatePath("/dashboard");
+}
+
+export async function markAllNotificationsReadAction(): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
+
+  revalidatePath("/dashboard");
+}
