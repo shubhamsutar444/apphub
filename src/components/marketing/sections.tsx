@@ -305,7 +305,7 @@ export function PublishingPlansSection() {
                 </li>
               ))}
             </ul>
-            <Link href="/publish">
+            <Link href="/submit-app">
               <Button className="w-full" variant={plan.highlight ? "primary" : "secondary"}>{plan.cta}</Button>
             </Link>
           </motion.div>
@@ -393,7 +393,7 @@ export function CTASection() {
             Join hundreds of developers already publishing on AppHub. First app just ₹1!
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/publish"><Button size="lg">Publish Your App</Button></Link>
+            <Link href="/submit-app"><Button size="lg">Publish Your App</Button></Link>
             <Link href="/marketplace"><Button variant="secondary" size="lg">Browse Apps</Button></Link>
           </div>
         </div>

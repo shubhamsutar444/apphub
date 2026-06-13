@@ -81,6 +81,16 @@ interface DashboardShellProps {
 
 export function DashboardShell({ role, children }: DashboardShellProps) {
   const pathname = usePathname();
+
+  // Admin uses top navigation bar — no sidebar needed
+  if (role === "admin") {
+    return (
+      <div className="section-container py-8">
+        {children}
+      </div>
+    );
+  }
+
   const navItems = getNavItems(role);
 
   return (

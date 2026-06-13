@@ -82,8 +82,6 @@ export default async function AdminDashboardPage() {
       <div>
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="mt-2 text-secondary-400">Platform overview and moderation controls</p>
-
-        {/* Stats Grid */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
             <Link key={stat.label} href={stat.href}>
