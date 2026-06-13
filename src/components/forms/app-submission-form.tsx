@@ -24,6 +24,7 @@ const PLANS = [
 interface AppSubmissionFormProps {
   categories: Category[];
   defaultPlan?: "basic" | "priority" | "featured";
+  isAdmin?: boolean;
 }
 
 function FileUploadZone({
@@ -166,7 +167,7 @@ function ScreenshotsUpload({
   );
 }
 
-export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubmissionFormProps) {
+export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin = false }: AppSubmissionFormProps) {
   const [selectedPlan, setSelectedPlan] = useState<"basic" | "priority" | "featured">(defaultPlan);
   const [state, formAction, pending] = useActionState(submitAppAction, {});
 

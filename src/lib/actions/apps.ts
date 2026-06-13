@@ -73,6 +73,8 @@ export async function submitAppAction(
   let screenshotUrls: string[] = [];
   try { screenshotUrls = JSON.parse(screenshotsRaw); } catch { screenshotUrls = []; }
 
+  const isAdmin = user.profile.role === "admin";
+
   const { data: app, error } = await supabase
     .from("applications")
     .insert({
@@ -90,7 +92,9 @@ export async function submitAppAction(
       publishing_plan: parsed.data.publishing_plan,
       icon_url: iconUrl,
       banner_url: bannerUrl,
-      status: "pending_review",
+      // Admin publishes instantly; regular devs go to pending_review
+      status: isAdmin ? "approved" : "pending_review",
+      published_at: isAdmin ? new Date().toISOString() : null,
     })
     .select("id")
     .single();
@@ -121,34 +125,36 @@ export async function submitAppAction(
     );
   }
 
-  // Create payment record
-  const planPrices = { basic: 9900, priority: 29900, featured: 99900 };
-  await supabase.from("payments").insert({
-    user_id: user.id,
-    application_id: app.id,
-    plan: parsed.data.publishing_plan,
-    amount_paise: planPrices[parsed.data.publishing_plan],
-    status: "pending",
-  });
+  // Create payment record (skip for admin)
+  if (!isAdmin) {
+    const planPrices = { basic: 9900, priority: 29900, featured: 99900 };
+    await supabase.from("payments").insert({
+      user_id: user.id,
+      application_id: app.id,
+      plan: parsed.data.publishing_plan,
+      amount_paise: planPrices[parsed.data.publishing_plan],
+      status: "pending",
+    });
 
-  // Notify admins
-  const adminClient = createAdminClient();
-  const { data: admins } = await adminClient
-    .from("users")
-    .select("id")
-    .eq("role", "admin");
+    // Notify admins about new submission
+    const adminClient = createAdminClient();
+    const { data: admins } = await adminClient
+      .from("users")
+      .select("id")
+      .eq("role", "admin");
 
-  if (admins && admins.length > 0) {
-    await adminClient.from("notifications").insert(
-      admins.map((admin) => ({
-        user_id: admin.id,
-        type: "new_submission" as const,
-        title: "New App Submission",
-        body: `${parsed.data.name} has been submitted for review.`,
-        link: `/dashboard/admin/apps`,
-        metadata: { app_id: app.id },
-      }))
-    );
+    if (admins && admins.length > 0) {
+      await adminClient.from("notifications").insert(
+        admins.map((admin) => ({
+          user_id: admin.id,
+          type: "new_submission" as const,
+          title: "New App Submission",
+          body: `${parsed.data.name} has been submitted for review.`,
+          link: `/dashboard/admin/apps`,
+          metadata: { app_id: app.id },
+        }))
+      );
+    }
   }
 
   revalidatePath("/dashboard/developer/apps");
