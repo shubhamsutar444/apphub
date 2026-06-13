@@ -3,10 +3,7 @@ import Razorpay from "razorpay";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/session";
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,13 +12,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      return NextResponse.json(
+        { error: "Payment gateway not configured. Please contact support." },
+        { status: 503 }
+      );
+    }
+
     const { plan, amount_paise } = await request.json();
 
     if (!plan || !amount_paise) {
       return NextResponse.json({ error: "Plan and amount required" }, { status: 400 });
     }
 
-    // Create Razorpay order
+    // Create Razorpay instance inside handler — not at module level
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
     const order = await razorpay.orders.create({
       amount: amount_paise,
       currency: "INR",
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
       amount_paise,
       status: "created",
       razorpay_order_id: order.id,
-      metadata: { razorpay_order: order, original_plan: plan },
+      metadata: { original_plan: plan },
     });
 
     return NextResponse.json({
