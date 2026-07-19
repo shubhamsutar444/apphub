@@ -23,14 +23,7 @@ function getKey(raw: string | undefined): string {
 const SUPABASE_URL = cleanUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const SUPABASE_KEY = getKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-// ── Debug logs (visible in browser console) ───────────────────────────────────
-if (typeof window !== "undefined") {
-  console.log("[AppHub] NEXT_PUBLIC_SUPABASE_URL (raw):", process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log("[AppHub] NEXT_PUBLIC_SUPABASE_ANON_KEY (raw start):", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 40));
-  console.log("[AppHub] Using URL:", SUPABASE_URL);
-  console.log("[AppHub] Using KEY starts:", SUPABASE_KEY.substring(0, 40));
-  console.log("[AppHub] KEY is fallback:", SUPABASE_KEY === CORRECT_KEY);
-}
+
 
 // ── Singleton browser client ──────────────────────────────────────────────────
 let _client: ReturnType<typeof createBrowserClient> | null = null;
