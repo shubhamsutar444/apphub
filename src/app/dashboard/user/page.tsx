@@ -5,9 +5,8 @@ import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import {
   Heart, Download, Star, User, ArrowRight,
-  Search, Package, Upload,
+  Search, Upload,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default async function UserDashboardPage() {
   const user = await requireRole("user");

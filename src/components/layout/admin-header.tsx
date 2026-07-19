@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Smartphone, Bell, LogOut, Shield } from "lucide-react";
+import { Smartphone, LogOut, Shield } from "lucide-react";
 import { APP_NAME } from "@/lib/constants/routes";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils/cn";

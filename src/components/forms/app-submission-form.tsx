@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, Info, Upload, X, CheckCircle, FileText, Image as ImageIcon,
 } from "lucide-react";

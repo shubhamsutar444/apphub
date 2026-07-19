@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, ChevronRight, Star, Download,
@@ -128,7 +129,7 @@ function FeaturedAppCard({ app, index }: { app: Application; index: number }) {
           <div className="flex items-start gap-4">
             <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-primary/10 ring-1 ring-primary/20">
               {app.icon_url
-                ? <img src={app.icon_url} alt={app.name} className="h-full w-full object-cover" />
+                ? <Image src={app.icon_url} alt={app.name} fill className="object-cover" sizes="64px" />
                 : <div className="flex h-full w-full items-center justify-center text-2xl">📱</div>}
             </div>
             <div className="min-w-0 flex-1">
@@ -217,7 +218,7 @@ export function TrendingAppsSection({ apps }: { apps: Application[] }) {
                   </span>
                   <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-primary/10 ring-1 ring-primary/15">
                     {app.icon_url
-                      ? <img src={app.icon_url} alt={app.name} className="h-full w-full object-cover" />
+                      ? <Image src={app.icon_url} alt={app.name} fill className="object-cover" sizes="48px" />
                       : <div className="flex h-full w-full items-center justify-center text-xl">📱</div>}
                   </div>
                   <div className="min-w-0 flex-1">
