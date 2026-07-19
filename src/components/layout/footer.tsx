@@ -1,6 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
-import { Github, Twitter, Mail } from "lucide-react";
+import { Github, Twitter, Mail, Smartphone } from "lucide-react";
 import { APP_NAME, APP_DESCRIPTION, ROUTES } from "@/lib/constants/routes";
 
 const FOOTER_LINKS = {
@@ -37,14 +36,8 @@ export function Footer() {
           {/* Brand col */}
           <div className="lg:col-span-2">
             <Link href={ROUTES.home} className="flex items-center gap-2.5">
-              <div className="relative h-9 w-9 overflow-hidden rounded-xl ring-1 ring-primary/20">
-                <Image
-                  src="/apphub-logo.png"
-                  alt="AppHub Logo"
-                  fill
-                  className="object-cover object-left"
-                  sizes="36px"
-                />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                <Smartphone className="h-5 w-5 text-primary" />
               </div>
               <span className="font-heading text-xl font-bold text-gradient">{APP_NAME}</span>
             </Link>

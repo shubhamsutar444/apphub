@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
-import { Bell, LogOut, Shield } from "lucide-react";
+import { Smartphone, Bell, LogOut, Shield } from "lucide-react";
 import { APP_NAME } from "@/lib/constants/routes";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils/cn";
@@ -27,15 +26,8 @@ export function AdminHeader() {
       <div className="flex h-16 items-center justify-between px-6">
         {/* Brand */}
         <Link href="/dashboard/admin" className="flex items-center gap-3">
-          <div className="relative h-9 w-9 overflow-hidden rounded-xl ring-1 ring-red-500/30">
-            <Image
-              src="/apphub-logo.png"
-              alt="AppHub Logo"
-              fill
-              className="object-cover object-right"
-              sizes="36px"
-              priority
-            />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/15 ring-1 ring-red-500/30">
+            <Smartphone className="h-5 w-5 text-red-400" />
           </div>
           <div>
             <span className="font-heading text-base font-bold text-white">{APP_NAME}</span>
