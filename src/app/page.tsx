@@ -14,37 +14,44 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { Application, Category } from "@/types";
 
-// No page transition wrapper on homepage — faster first paint
-async function getHomeData() {
-  const supabase = await createClient();
-  const [{ data: featuredApps }, { data: trendingApps }, { data: categories }] =
-    await Promise.all([
-      supabase
-        .from("applications")
-        .select("id,name,slug,short_description,icon_url,rating_avg,download_count,is_featured,is_editors_choice,categories:category_id(name),developers:developer_id(display_name,slug)")
-        .eq("status", "approved")
-        .eq("is_featured", true)
-        .order("published_at", { ascending: false })
-        .limit(8),
-      supabase
-        .from("applications")
-        .select("id,name,slug,short_description,icon_url,rating_avg,download_count,categories:category_id(name),developers:developer_id(display_name,slug)")
-        .eq("status", "approved")
-        .order("download_count", { ascending: false })
-        .limit(6),
-      supabase
-        .from("categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order")
-        .limit(12),
-    ]);
+// Cache homepage for 5 minutes — massively speeds up repeat visits
+export const revalidate = 300;
 
-  return {
-    featuredApps: (featuredApps ?? []) as unknown as Application[],
-    trendingApps: (trendingApps ?? []) as unknown as Application[],
-    categories: (categories ?? []) as unknown as Category[],
-  };
+async function getHomeData() {
+  try {
+    const supabase = await createClient();
+    const [{ data: featuredApps }, { data: trendingApps }, { data: categories }] =
+      await Promise.all([
+        supabase
+          .from("applications")
+          .select("id,name,slug,short_description,icon_url,rating_avg,download_count,is_featured,is_editors_choice,categories:category_id(name),developers:developer_id(display_name,slug)")
+          .eq("status", "approved")
+          .eq("is_featured", true)
+          .order("published_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("applications")
+          .select("id,name,slug,short_description,icon_url,rating_avg,download_count,categories:category_id(name),developers:developer_id(display_name,slug)")
+          .eq("status", "approved")
+          .order("download_count", { ascending: false })
+          .limit(6),
+        supabase
+          .from("categories")
+          .select("id,name,slug,icon,description,sort_order")
+          .eq("is_active", true)
+          .order("sort_order")
+          .limit(12),
+      ]);
+
+    return {
+      featuredApps: (featuredApps ?? []) as unknown as Application[],
+      trendingApps: (trendingApps ?? []) as unknown as Application[],
+      categories: (categories ?? []) as unknown as Category[],
+    };
+  } catch {
+    // If DB is unavailable, return empty data — page still loads
+    return { featuredApps: [], trendingApps: [], categories: [] };
+  }
 }
 
 export default async function HomePage() {
@@ -53,20 +60,11 @@ export default async function HomePage() {
   return (
     <MainLayout>
       <Hero />
-
       <Suspense fallback={null}>
         <StatsSection />
       </Suspense>
-
-      {/* Only show sections if there is real data */}
-      {featuredApps.length > 0 && (
-        <FeaturedSection apps={featuredApps} />
-      )}
-
-      {trendingApps.length > 0 && (
-        <TrendingAppsSection apps={trendingApps} />
-      )}
-
+      {featuredApps.length > 0 && <FeaturedSection apps={featuredApps} />}
+      {trendingApps.length > 0 && <TrendingAppsSection apps={trendingApps} />}
       <CategoriesSection categories={categories.length > 0 ? categories : undefined} />
       <PublishingPlansSection />
       <TestimonialsSection />

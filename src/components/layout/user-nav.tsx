@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogOut, LayoutDashboard, User, ChevronDown } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { logoutAction } from "@/lib/actions/auth";
+import { createClient, getCachedProfile, clearProfileCache } from "@/lib/supabase/client";
 import { getDefaultDashboardPath } from "@/lib/auth/roles";
 import { ROUTES } from "@/lib/constants/routes";
 import { Button } from "@/components/ui/button";
@@ -13,46 +11,37 @@ import type { UserProfile } from "@/types";
 import { cn } from "@/lib/utils/cn";
 
 export function UserNav() {
-  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-
-    async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .single<UserProfile>();
-
-      setProfile(data);
+    // Use cached profile — no extra DB call
+    getCachedProfile().then((p) => {
+      setProfile(p);
       setLoading(false);
-    }
+    });
 
-    loadProfile();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadProfile();
-      router.refresh();
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        clearProfileCache();
+        setProfile(null);
+      } else if (event === "SIGNED_IN") {
+        clearProfileCache();
+        getCachedProfile().then(setProfile);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    clearProfileCache();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
 
   if (loading) {
     return <div className="hidden h-10 w-24 animate-pulse rounded-xl bg-white/5 sm:block" />;
@@ -62,9 +51,7 @@ export function UserNav() {
     return (
       <div className="hidden items-center gap-2 sm:flex">
         <Link href={ROUTES.login}>
-          <Button variant="ghost" size="sm">
-            Sign In
-          </Button>
+          <Button variant="ghost" size="sm">Sign In</Button>
         </Link>
         <Link href={ROUTES.signup}>
           <Button size="sm">Get Started</Button>
@@ -101,31 +88,21 @@ export function UserNav() {
                 {profile.role}
               </span>
             </div>
-            <Link
-              href={dashboardPath}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-secondary-300 hover:bg-white/5 hover:text-white"
-            >
+            <Link href={dashboardPath} onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-secondary-300 hover:bg-white/5 hover:text-white">
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Link>
-            <Link
-              href={`${ROUTES.dashboard.user}/profile`}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-secondary-300 hover:bg-white/5 hover:text-white"
-            >
+            <Link href={`${ROUTES.dashboard.user}/profile`} onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-secondary-300 hover:bg-white/5 hover:text-white">
               <User className="h-4 w-4" />
               Profile
             </Link>
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
-            </form>
+            <button type="button" onClick={handleLogout}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10">
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </button>
           </div>
         </>
       )}
