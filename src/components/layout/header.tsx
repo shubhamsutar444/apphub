@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X, Smartphone, Upload, LayoutDashboard } from "lucide-react";
+import Image from "next/image";
+import { Menu, X, Upload, LayoutDashboard } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserNav } from "@/components/layout/user-nav";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
@@ -78,8 +79,15 @@ export function Header() {
         <div className="section-container flex h-16 items-center justify-between lg:h-20">
 
           <Link href={ROUTES.home} className="group flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30 transition-all group-hover:bg-primary/25 group-hover:shadow-glow">
-              <Smartphone className="h-5 w-5 text-primary" />
+            <div className="relative h-9 w-9 overflow-hidden rounded-xl ring-1 ring-primary/30 transition-all group-hover:shadow-glow">
+              <Image
+                src="/apphub-logo.png"
+                alt="AppHub Logo"
+                fill
+                className="object-cover object-left"
+                sizes="36px"
+                priority
+              />
             </div>
             <span className="font-heading text-xl font-bold tracking-tight text-gradient">
               {APP_NAME}
