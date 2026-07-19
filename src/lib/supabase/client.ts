@@ -1,24 +1,33 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { UserProfile } from "@/types";
 
-const FALLBACK_URL = "https://lsluxdheynctqkewlvmu.supabase.co";
-const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzbHV4ZGhleW5jdHFrZXdsdm11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MjExMDUsImV4cCI6MjA5MzI5NzEwNX0.Z-zXIbRE3NpNiEe9dfMt_xaNG2KYImi63E5QrWnGr0Q";
+// ── Environment variable validation ──────────────────────────────────────────
+// These MUST be set in Vercel Dashboard → Settings → Environment Variables.
+// They are NOT deployed from .env.local (which is gitignored).
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-function cleanUrl(raw: string | undefined): string {
-  if (!raw) return FALLBACK_URL;
-  const match = raw.match(/https?:\/\/[a-zA-Z0-9\-]+\.supabase\.co/);
-  return match ? match[0] : (raw.trim() || FALLBACK_URL);
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  // Surface a clear error instead of silently using stale/dead fallback credentials
+  const missing = [
+    !SUPABASE_URL && "NEXT_PUBLIC_SUPABASE_URL",
+    !SUPABASE_KEY && "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  throw new Error(
+    `[Supabase] Missing environment variable(s): ${missing}. ` +
+    `Add them to Vercel Dashboard → Settings → Environment Variables.`
+  );
 }
-
-const SUPABASE_URL = cleanUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const SUPABASE_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim() || FALLBACK_KEY;
 
 // ── Singleton browser client ──────────────────────────────────────────────────
 let _client: ReturnType<typeof createBrowserClient> | null = null;
 
 export function createClient() {
   if (!_client) {
-    _client = createBrowserClient<any>(SUPABASE_URL, SUPABASE_KEY);
+    // TypeScript: SUPABASE_URL and SUPABASE_KEY are guaranteed non-empty after the guard above
+    _client = createBrowserClient<any>(SUPABASE_URL!, SUPABASE_KEY!);
   }
   return _client;
 }

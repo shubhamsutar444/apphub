@@ -1,18 +1,26 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const FALLBACK_URL = "https://lsluxdheynctqkewlvmu.supabase.co";
-const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzbHV4ZGhleW5jdHFrZXdsdm11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MjExMDUsImV4cCI6MjA5MzI5NzEwNX0.Z-zXIbRE3NpNiEe9dfMt_xaNG2KYImi63E5QrWnGr0Q";
-
-function cleanUrl(raw: string | undefined): string {
-  if (!raw) return FALLBACK_URL;
-  const match = raw.match(/https?:\/\/[a-zA-Z0-9\-]+\.supabase\.co/);
-  return match ? match[0] : (raw.trim() || FALLBACK_URL);
+// ── Environment variable validation ──────────────────────────────────────────
+// These MUST be set in Vercel Dashboard → Settings → Environment Variables.
+// They are NOT deployed from .env.local (which is gitignored).
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    const missing = [!url && "NEXT_PUBLIC_SUPABASE_URL", !key && "NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      .filter(Boolean)
+      .join(", ");
+    throw new Error(
+      `[Supabase] Missing environment variable(s): ${missing}. ` +
+      `Add them to Vercel Dashboard → Settings → Environment Variables.`
+    );
+  }
+  return { url, key };
 }
 
 export async function createClient() {
-  const supabaseUrl = cleanUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim() || FALLBACK_KEY;
+  const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig();
   const cookieStore = await cookies();
 
   return createServerClient<any>(supabaseUrl, supabaseKey, {
