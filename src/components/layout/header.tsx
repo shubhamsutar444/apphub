@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, Smartphone, Upload, LayoutDashboard } from "lucide-react";
@@ -33,6 +34,7 @@ const DEVELOPER_NAV = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -63,8 +65,8 @@ export function Header() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Admin has dedicated header — skip rendering this one
-  if (ready && userRole === "admin") return null;
+  // Admin has dedicated header in the admin dashboard — skip rendering this one
+  if (ready && userRole === "admin" && pathname?.startsWith("/dashboard/admin")) return null;
 
   const navLinks = userRole === "developer"
     ? DEVELOPER_NAV
