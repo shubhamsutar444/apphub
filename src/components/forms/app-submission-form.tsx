@@ -167,7 +167,7 @@ function ScreenshotsUpload({
   );
 }
 
-export function AppSubmissionForm({ categories, defaultPlan = "basic", isAdmin = false }: AppSubmissionFormProps) {
+export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubmissionFormProps) {
   const [selectedPlan, setSelectedPlan] = useState<"basic" | "priority" | "featured">(defaultPlan);
   const [state, formAction, pending] = useActionState(submitAppAction, {});
 

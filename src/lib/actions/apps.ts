@@ -192,6 +192,19 @@ export async function updateAppAction(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
+  // First fetch the current app status so we know if it was "changes_requested"
+  const { data: currentApp } = await supabase
+    .from("applications")
+    .select("id, name, status, developer_id")
+    .eq("id", appId)
+    .single();
+
+  if (!currentApp) return { error: "App not found" };
+
+  // If developer is submitting changes that were requested by admin,
+  // move status back to pending_review so admin can review again
+  const wasChangesRequested = currentApp.status === "changes_requested";
+
   const { error } = await supabase
     .from("applications")
     .update({
@@ -204,13 +217,47 @@ export async function updateAppAction(
       privacy_policy_url: parsed.data.privacy_policy_url || null,
       support_email: parsed.data.support_email || null,
       tags: tagsArray,
+      // Automatically re-submit for review when changes are made
+      ...(wasChangesRequested ? { status: "pending_review", admin_notes: null } : {}),
     })
     .eq("id", appId);
 
   if (error) return { error: error.message };
 
+  // Notify all admins that the developer has made the requested changes
+  if (wasChangesRequested) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: admins } = await adminClient
+        .from("users")
+        .select("id")
+        .eq("role", "admin");
+
+      if (admins && admins.length > 0) {
+        await adminClient.from("notifications").insert(
+          admins.map((admin) => ({
+            user_id: admin.id,
+            type: "app_updated" as const,
+            title: "✅ Developer Made Changes",
+            body: `"${parsed.data.name}" has been updated and re-submitted for review.`,
+            link: `/dashboard/admin/apps`,
+            metadata: { app_id: appId },
+          }))
+        );
+      }
+    } catch {
+      // Notification failure shouldn't block the save
+    }
+  }
+
   revalidatePath("/dashboard/developer/apps");
-  return { success: "App updated successfully" };
+  revalidatePath(`/dashboard/admin/apps`);
+
+  return {
+    success: wasChangesRequested
+      ? "Changes saved and re-submitted for review! Admin has been notified."
+      : "App updated successfully",
+  };
 }
 
 export async function deleteAppAction(appId: string): Promise<AppActionState> {
