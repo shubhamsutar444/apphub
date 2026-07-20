@@ -60,7 +60,7 @@ const FAQS = [
   { q: "How do I publish my app on AppHub?",
     a: "Sign up, choose a publishing plan (starting at ₹1 for first-timers!), become a developer, fill the submission form, upload your APK + screenshots, and submit for review. We typically review within 24–48 hours." },
   { q: "What are the publishing plans and prices?",
-    a: "First-time publishers pay just ₹1. After that: Basic ₹99 (standard listing), Priority ₹299 (faster review + highlighted), Featured ₹999 (homepage feature slot)." },
+    a: "Currently we have a ₹1 Trial plan — publish your app for just ₹1. Priority (₹299) and Featured (₹999) plans are coming soon." },
   { q: "Is AppHub safe to download apps from?",
     a: "Yes! Every app is manually reviewed before listing. We check for malware, privacy violations, and policy compliance." },
   { q: "What file formats are supported for APK uploads?",
@@ -269,49 +269,106 @@ export function CategoriesSection({ categories }: { categories?: Category[] }) {
 export function PublishingPlansSection() {
   const plans = [
     {
-      name: "Basic", price: "₹99", period: "per app", highlight: false, cta: "Get Started",
-      features: ["Standard listing", "24–72h review", "App analytics", "Community support", "Unlimited updates"],
+      name: "Trial",
+      price: "₹1",
+      period: "per app",
+      highlight: true,
+      active: true,
+      badge: "🎉 Active Now",
+      cta: "Start for ₹1",
+      features: [
+        "Full standard listing",
+        "24–72h review time",
+        "App analytics",
+        "Community support",
+        "Unlimited updates",
+      ],
     },
     {
-      name: "Priority", price: "₹299", period: "per app", highlight: true, cta: "Go Priority",
-      features: ["Highlighted listing", "12–24h review", "Advanced analytics", "Priority support", "Badge on listing"],
+      name: "Basic",
+      price: "₹99",
+      period: "per app",
+      highlight: false,
+      active: false,
+      badge: "Coming Soon",
+      cta: "Coming Soon",
+      features: [
+        "Highlighted listing",
+        "12–24h review time",
+        "Advanced analytics",
+        "Priority support",
+        "Badge on listing",
+      ],
     },
     {
-      name: "Featured", price: "₹999", period: "per app", highlight: false, cta: "Go Featured",
-      features: ["Homepage feature slot", "6–12h review", "Premium analytics", "Dedicated support", "Newsletter mention"],
+      name: "Featured",
+      price: "₹999",
+      period: "per app",
+      highlight: false,
+      active: false,
+      badge: "Coming Soon",
+      cta: "Coming Soon",
+      features: [
+        "Homepage featured slot",
+        "6–12h review time",
+        "Premium analytics",
+        "Dedicated support",
+        "Newsletter mention",
+      ],
     },
   ];
+
   return (
     <section className="section-container py-20">
       <SectionHeader title="Simple, Affordable Pricing" subtitle="Publish your app and reach thousands of users" />
       <div className="grid gap-8 sm:grid-cols-3">
         {plans.map((plan, i) => (
-          <motion.div key={plan.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-            className={`relative rounded-2xl p-6 ${plan.highlight ? "border-2 border-primary bg-primary/5 shadow-glow" : "border border-primary/10 bg-night-900/60"}`}>
-            {plan.highlight && (
+          <motion.div
+            key={plan.name}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className={`relative rounded-2xl p-6 transition-all ${
+              plan.active
+                ? "border-2 border-primary bg-primary/5 shadow-glow"
+                : "border border-white/10 bg-night-900/40 opacity-60"
+            }`}
+          >
+            {plan.badge && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="rounded-full bg-primary px-4 py-1 text-xs font-bold text-night-900">Most Popular</span>
+                <span className={`rounded-full px-4 py-1 text-xs font-bold ${
+                  plan.active ? "bg-primary text-night-900" : "bg-secondary-700 text-secondary-300"
+                }`}>
+                  {plan.badge}
+                </span>
               </div>
             )}
             <h3 className="font-heading text-lg font-bold">{plan.name}</h3>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="font-heading text-4xl font-bold text-primary">{plan.price}</span>
+              <span className={`font-heading text-4xl font-bold ${plan.active ? "text-primary" : "text-secondary-400"}`}>
+                {plan.price}
+              </span>
               <span className="text-sm text-secondary-400">{plan.period}</span>
             </div>
             <ul className="my-6 space-y-2.5">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm text-secondary-300">
-                  <span className="text-primary font-bold">✓</span> {f}
+                  <span className={plan.active ? "text-primary font-bold" : "text-secondary-600"}>✓</span> {f}
                 </li>
               ))}
             </ul>
-            <Link href="/submit-app">
-              <Button className="w-full" variant={plan.highlight ? "primary" : "secondary"}>{plan.cta}</Button>
+            <Link href={plan.active ? "/submit-app" : "#"}>
+              <Button className="w-full" variant={plan.active ? "primary" : "secondary"} disabled={!plan.active}>
+                {plan.cta}
+              </Button>
             </Link>
           </motion.div>
         ))}
       </div>
+      <p className="mt-6 text-center text-sm text-secondary-500">
+        Priority and Featured plans coming soon. Currently all publishers get the ₹1 trial rate.
+      </p>
     </section>
   );
 }

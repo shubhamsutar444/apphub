@@ -53,13 +53,13 @@ export default async function PublishPage() {
       .eq("id", user.id);
   }
 
-  // ── Record dummy payment as paid ──────────────────────────────────────
+  // ── Record ₹1 trial payment as paid (dummy) ───────────────────────────
   await supabase.from("payments").insert({
     user_id: user.id,
     plan: "basic",
-    amount_paise: 100, // ₹1 — symbolic
+    amount_paise: 100, // ₹1 trial plan
     status: "paid",
-    metadata: { demo: true, auto_approved: true },
+    metadata: { demo: true, plan_name: "₹1 Trial", auto_approved: true },
   });
 
   // ── Redirect directly to app submission ───────────────────────────────
