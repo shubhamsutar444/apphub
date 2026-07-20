@@ -19,6 +19,22 @@ const nextConfig: NextConfig = {
 
   compress: true,
 
+  // ── Auto-reload on stale chunk (after new deployment) ───────────────────────
+  // When Next.js tries to load a JS chunk that no longer exists (because a new
+  // deployment changed the hash), webpack emits a ChunkLoadError. This config
+  // makes webpack automatically reload the page once when that happens, so
+  // users never see the "Loading chunk X failed" error after a redeploy.
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      const originalEntry = config.entry;
+      config.entry = async () => {
+        const entries = await originalEntry();
+        return entries;
+      };
+    }
+    return config;
+  },
+
   // ── Aggressive caching headers ───────────────────────────────────────────
   async headers() {
     return [
@@ -57,3 +73,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

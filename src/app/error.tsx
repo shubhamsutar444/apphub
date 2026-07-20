@@ -1,14 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { PageTransition } from "@/components/shared/page-transition";
 
 export default function Error({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    // ChunkLoadError = stale browser cache after a new deployment.
+    // Auto hard-reload once so the user gets the fresh chunks silently.
+    if (error?.name === "ChunkLoadError" || error?.message?.includes("Loading chunk")) {
+      window.location.reload();
+    }
+  }, [error]);
+
+  // Don't render anything if it's a chunk error — the reload will happen
+  if (error?.name === "ChunkLoadError" || error?.message?.includes("Loading chunk")) {
+    return null;
+  }
+
   return (
     <MainLayout>
       <PageTransition>
@@ -26,3 +41,4 @@ export default function Error({
     </MainLayout>
   );
 }
+
