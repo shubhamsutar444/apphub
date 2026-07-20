@@ -166,7 +166,7 @@ export default async function AppDetailPage({ params }: AppPageProps) {
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
 
             {/* ── Left/Main column ────────────────────────────────── */}
-            <div className="space-y-5 lg:col-span-2">
+            <div className="space-y-5 lg:col-span-2 min-w-0">
 
               {/* Actions */}
               <AppDetailClient
@@ -196,7 +196,7 @@ export default async function AppDetailPage({ params }: AppPageProps) {
               {/* Description */}
               <Card>
                 <h2 className="mb-3 font-heading text-base font-semibold sm:text-lg">About this app</h2>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary-300">
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-secondary-300">
                   {typedApp.full_description}
                 </p>
                 {typedApp.tags && typedApp.tags.length > 0 && (
@@ -310,13 +310,13 @@ function AppInfoCard({
             {typedApp.developer_website && (
               <a href={typedApp.developer_website} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-primary hover:underline">
-                <Globe className="h-4 w-4" />Developer Website<ExternalLink className="h-3 w-3" />
+                <Globe className="h-4 w-4 shrink-0" /><span className="truncate">Developer Website</span><ExternalLink className="h-3 w-3 shrink-0" />
               </a>
             )}
             {typedApp.privacy_policy_url && (
               <a href={typedApp.privacy_policy_url} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-secondary-400 hover:text-white">
-                <Shield className="h-4 w-4" />Privacy Policy<ExternalLink className="h-3 w-3" />
+                <Shield className="h-4 w-4 shrink-0" /><span className="truncate">Privacy Policy</span><ExternalLink className="h-3 w-3 shrink-0" />
               </a>
             )}
           </div>
@@ -330,8 +330,8 @@ function AppInfoCard({
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
               {dev.display_name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <p className="font-medium group-hover:text-primary transition-colors">{dev.display_name}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium group-hover:text-primary transition-colors">{dev.display_name}</p>
               {dev.is_verified && (
                 <Badge variant="info" className="mt-0.5"><Shield className="h-2.5 w-2.5" />Verified</Badge>
               )}
