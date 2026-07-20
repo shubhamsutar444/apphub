@@ -84,15 +84,15 @@ function ShareableLinkBar({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-2.5">
+    <div className="flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2">
       <LinkIcon className="h-4 w-4 shrink-0 text-primary" />
-      <span className="min-w-0 flex-1 truncate text-xs text-secondary-300">{shareUrl}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-secondary-300 overflow-hidden">{shareUrl}</span>
       <button
         type="button"
         onClick={handleCopy}
-        className="shrink-0 rounded-lg bg-primary/15 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/25"
+        className="ml-1 shrink-0 rounded-lg bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/25"
       >
-        {copied ? "Copied!" : "Copy"}
+        {copied ? "✓" : "Copy"}
       </button>
     </div>
   );
@@ -127,37 +127,43 @@ export function AppDetailClient({
   return (
     <div className="space-y-5">
       {/* ── Action Buttons ──────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3">
+        {/* Primary: Download full width on mobile */}
         <Button
           onClick={handleDownload}
           disabled={!latestVersion || downloading}
           size="lg"
-          className="flex-1 sm:flex-none min-w-[160px] gap-2"
+          className="w-full gap-2"
         >
           {downloading
             ? <><Loader2 className="h-4 w-4 animate-spin" /> Downloading...</>
             : <><Download className="h-4 w-4" /> Download APK</>}
         </Button>
 
-        {user && (
-          <Button
-            variant={favorited ? "primary" : "secondary"}
-            size="lg"
-            onClick={handleFavorite}
-            className="gap-2"
-          >
-            <Heart className={`h-4 w-4 ${favorited ? "fill-current" : ""}`} />
-            {favorited ? "Saved" : "Save"}
+        {/* Secondary row: Save + Share + Report */}
+        <div className="grid grid-cols-3 gap-2">
+          {user ? (
+            <Button
+              variant={favorited ? "primary" : "secondary"}
+              onClick={handleFavorite}
+              className="gap-1.5 text-sm"
+            >
+              <Heart className={`h-4 w-4 ${favorited ? "fill-current" : ""}`} />
+              <span className="hidden sm:inline">{favorited ? "Saved" : "Save"}</span>
+              <span className="sm:hidden">{favorited ? "Saved" : "Save"}</span>
+            </Button>
+          ) : (
+            <a href="/login" className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 text-sm font-medium text-secondary-300 hover:border-primary/30">
+              <Heart className="h-4 w-4" />
+              <span>Save</span>
+            </a>
+          )}
+          <ShareButton appName={app.name} slug={app.slug} />
+          <Button variant="ghost" className="gap-1.5 text-sm text-red-400 hover:text-red-300">
+            <Flag className="h-4 w-4" />
+            <span>Report</span>
           </Button>
-        )}
-
-        {/* Share button — copies link or opens native share sheet on mobile */}
-        <ShareButton appName={app.name} slug={app.slug} />
-
-        <Button variant="ghost" size="lg" className="gap-2 text-red-400 hover:text-red-300">
-          <Flag className="h-4 w-4" />
-          Report
-        </Button>
+        </div>
       </div>
 
       {/* ── Shareable link bar ──────────────────────────────────── */}

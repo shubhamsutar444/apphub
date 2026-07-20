@@ -107,7 +107,7 @@ export default async function AppDetailPage({ params }: AppPageProps) {
 
   return (
     <MainLayout>
-      <div className="min-h-screen">
+      <div className="min-h-screen overflow-x-hidden">
         {/* ── Banner ─────────────────────────────────────────────────── */}
         {typedApp.banner_url && (
           <div className="relative h-44 w-full overflow-hidden sm:h-56 lg:h-72">
@@ -151,11 +151,11 @@ export default async function AppDetailPage({ params }: AppPageProps) {
                 <RatingDisplay rating={typedApp.rating_avg} count={typedApp.rating_count} />
               </div>
               {/* Quick stats row */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-400">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-400">
                 <span className="flex items-center gap-1">
                   <Download className="h-3 w-3" />{typedApp.download_count.toLocaleString()}
                 </span>
-                {cat && <span>{cat.name}</span>}
+                {cat && <span className="truncate max-w-[80px]">{cat.name}</span>}
                 {typedApp.current_version && <span>v{typedApp.current_version}</span>}
                 <span>{formatBytes(typedApp.apk_size_bytes)}</span>
               </div>
@@ -292,7 +292,7 @@ function AppInfoCard({
     <>
       <Card>
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-secondary-400">App Info</h3>
-        <div className="grid grid-cols-2 gap-3 sm:block sm:space-y-3">
+        <div className="space-y-3">
           {[
             { icon: Package, label: "Version", value: typedApp.current_version ?? "—" },
             { icon: Download, label: "Size", value: formatBytes(typedApp.apk_size_bytes) },
