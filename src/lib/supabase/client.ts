@@ -17,6 +17,23 @@ function getKey(raw: string | undefined): string {
   const trimmed = raw.trim();
   // If key doesn't start with eyJ it's invalid — use fallback
   if (!trimmed.startsWith("eyJ")) return CORRECT_KEY;
+
+  // Security check: Ensure the provided key is actually the anon key and not a user access token.
+  // If a user accidentally pastes their access token in Vercel env vars, everyone will log in as them!
+  try {
+    const parts = trimmed.split(".");
+    if (parts.length === 3) {
+      // Decode base64url payload
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.role && payload.role !== "anon") {
+        console.warn("Invalid anon key detected (role is not anon). Falling back to correct key.");
+        return CORRECT_KEY;
+      }
+    }
+  } catch (e) {
+    // Ignore decode errors
+  }
+
   return trimmed;
 }
 

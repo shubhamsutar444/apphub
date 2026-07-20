@@ -15,6 +15,20 @@ function getKey(raw: string | undefined): string {
   if (!raw) return CORRECT_KEY;
   const trimmed = raw.trim();
   if (!trimmed.startsWith("eyJ")) return CORRECT_KEY;
+
+  try {
+    const parts = trimmed.split(".");
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.role && payload.role !== "anon") {
+        console.warn("Invalid anon key detected (role is not anon). Falling back to correct key.");
+        return CORRECT_KEY;
+      }
+    }
+  } catch (e) {
+    // Ignore decode errors
+  }
+
   return trimmed;
 }
 
