@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 export interface UploadResult {
   url?: string;
   path?: string;
+  sizeBytes?: number;
   error?: string;
 }
 
@@ -68,5 +69,5 @@ export async function uploadFileDirect(
     .from(bucket)
     .getPublicUrl(data.path);
 
-  return { url: publicUrl, path: data.path };
+  return { url: publicUrl, path: data.path, sizeBytes: file.size };
 }

@@ -7,6 +7,7 @@ import { PageTransition } from "@/components/shared/page-transition";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { AppDetailClient } from "@/components/apps/app-detail-client";
+import { ScreenshotGallery } from "@/components/apps/screenshot-gallery";
 import { RatingDisplay } from "@/components/apps/star-rating";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -257,23 +258,13 @@ export default async function AppDetailPage({ params }: AppPageProps) {
               {/* Screenshots */}
               {screenshots && screenshots.length > 0 && (
                 <Card>
-                  <h2 className="mb-4 text-lg font-semibold">Screenshots</h2>
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                    {(screenshots as ApplicationScreenshot[]).map((ss) => (
-                      <div
-                        key={ss.id}
-                        className="relative h-48 w-28 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10 sm:h-56 sm:w-32"
-                      >
-                        <Image
-                          src={ss.url}
-                          alt="Screenshot"
-                          fill
-                          className="object-cover"
-                          sizes="128px"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <h2 className="mb-4 text-lg font-semibold">
+                    Screenshots
+                    <span className="ml-2 text-sm font-normal text-secondary-500">
+                      (tap to expand)
+                    </span>
+                  </h2>
+                  <ScreenshotGallery screenshots={screenshots as ApplicationScreenshot[]} />
                 </Card>
               )}
 

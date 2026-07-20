@@ -184,6 +184,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
   const [apkUrl, setApkUrl] = useState("");
   const [apkPath, setApkPath] = useState("");
   const [apkName, setApkName] = useState("");
+  const [apkSizeBytes, setApkSizeBytes] = useState(0);
   const [apkUploading, setApkUploading] = useState(false);
   const [apkError, setApkError] = useState("");
   const [apkProgress, setApkProgress] = useState(0);
@@ -213,6 +214,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
     setApkUrl(result.url!);
     setApkPath(result.path!);
     setApkName(file.name);
+    setApkSizeBytes(result.sizeBytes ?? file.size); // auto-detect size
   };
 
   const uploadIcon = async (file: File) => {
@@ -251,6 +253,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
       {/* Hidden fields for uploaded files */}
       <input type="hidden" name="apk_url" value={apkUrl} />
       <input type="hidden" name="apk_path" value={apkPath} />
+      <input type="hidden" name="apk_size_bytes" value={apkSizeBytes} />
       <input type="hidden" name="icon_url" value={iconUrl} />
       <input type="hidden" name="banner_url" value={bannerUrl} />
       <input type="hidden" name="screenshots" value={JSON.stringify(screenshots.map((s) => s.url))} />

@@ -69,6 +69,7 @@ export async function submitAppAction(
   const iconUrl = formData.get("icon_url")?.toString() || null;
   const bannerUrl = formData.get("banner_url")?.toString() || null;
   const apkUrl = formData.get("apk_url")?.toString() || null;
+  const apkSizeBytes = parseInt(formData.get("apk_size_bytes")?.toString() ?? "0") || 0;
   const screenshotsRaw = formData.get("screenshots")?.toString() || "[]";
   let screenshotUrls: string[] = [];
   try { screenshotUrls = JSON.parse(screenshotsRaw); } catch { screenshotUrls = []; }
@@ -92,6 +93,7 @@ export async function submitAppAction(
       publishing_plan: parsed.data.publishing_plan,
       icon_url: iconUrl,
       banner_url: bannerUrl,
+      apk_size_bytes: apkSizeBytes || null,
       // Admin publishes instantly; regular devs go to pending_review
       status: isAdmin ? "approved" : "pending_review",
       published_at: isAdmin ? new Date().toISOString() : null,
@@ -109,7 +111,7 @@ export async function submitAppAction(
       application_id: app.id,
       version: parsed.data.version,
       apk_path: apkUrl,
-      apk_size_bytes: 0,
+      apk_size_bytes: apkSizeBytes || 0,
       is_active: true,
     });
   }
