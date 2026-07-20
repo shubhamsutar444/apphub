@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { MainLayout } from "@/components/layout/main-layout";
 import { PageTransition } from "@/components/shared/page-transition";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,47 @@ import {
 
 interface AppPageProps {
   params: Promise<{ slug: string }>;
+}
+
+// ── Dynamic Open Graph metadata ───────────────────────────────────────────────
+// Makes sharing on WhatsApp, Telegram, Twitter show a rich preview card
+export async function generateMetadata({ params }: AppPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+
+  const { data: app } = await supabase
+    .from("applications")
+    .select("name, short_description, icon_url, banner_url, rating_avg, download_count")
+    .eq("slug", slug)
+    .eq("status", "approved")
+    .single();
+
+  if (!app) {
+    return { title: "App Not Found" };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://apphub-k384-git-main-shubhamsutar444s-projects.vercel.app";
+  const pageUrl = `${appUrl}/apps/${slug}`;
+  const image = app.banner_url || app.icon_url || `${appUrl}/og-default.png`;
+
+  return {
+    title: `${app.name} — AppHub`,
+    description: app.short_description,
+    openGraph: {
+      title: `${app.name} — Download on AppHub`,
+      description: `${app.short_description} · ★ ${app.rating_avg > 0 ? app.rating_avg.toFixed(1) : "New"} · ${app.download_count?.toLocaleString()} downloads`,
+      url: pageUrl,
+      type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: app.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${app.name} — Download on AppHub`,
+      description: app.short_description,
+      images: [image],
+    },
+    alternates: { canonical: pageUrl },
+  };
 }
 
 function formatBytes(bytes: number | null): string {
