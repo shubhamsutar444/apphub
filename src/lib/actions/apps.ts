@@ -192,6 +192,17 @@ export async function updateAppAction(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
+  // Collect updated file URLs if developer uploaded new ones
+  const newIconUrl = formData.get("icon_url")?.toString() || null;
+  const newBannerUrl = formData.get("banner_url")?.toString() || null;
+  const newApkUrl = formData.get("apk_url")?.toString() || null;
+  const newApkVersion = formData.get("apk_version")?.toString() || null;
+  const screenshotsRaw = formData.get("screenshots")?.toString();
+  let newScreenshots: string[] | null = null;
+  if (screenshotsRaw) {
+    try { newScreenshots = JSON.parse(screenshotsRaw); } catch { newScreenshots = null; }
+  }
+
   // First fetch the current app status so we know if it was "changes_requested"
   const { data: currentApp } = await supabase
     .from("applications")
@@ -217,12 +228,50 @@ export async function updateAppAction(
       privacy_policy_url: parsed.data.privacy_policy_url || null,
       support_email: parsed.data.support_email || null,
       tags: tagsArray,
+      // Update file URLs only if new ones were uploaded
+      ...(newIconUrl ? { icon_url: newIconUrl } : {}),
+      ...(newBannerUrl ? { banner_url: newBannerUrl } : {}),
       // Automatically re-submit for review when changes are made
       ...(wasChangesRequested ? { status: "pending_review", admin_notes: null } : {}),
     })
     .eq("id", appId);
 
   if (error) return { error: error.message };
+
+  // Save new APK version if uploaded
+  if (newApkUrl && newApkVersion) {
+    // Deactivate old versions
+    await supabase
+      .from("application_versions")
+      .update({ is_active: false })
+      .eq("application_id", appId);
+
+    await supabase.from("application_versions").insert({
+      application_id: appId,
+      version: newApkVersion,
+      apk_path: newApkUrl,
+      apk_size_bytes: 0,
+      is_active: true,
+    });
+  }
+
+  // Replace screenshots if new ones were provided
+  if (newScreenshots && newScreenshots.length > 0) {
+    // Delete old screenshots
+    await supabase
+      .from("application_screenshots")
+      .delete()
+      .eq("application_id", appId);
+
+    // Insert new ones
+    await supabase.from("application_screenshots").insert(
+      newScreenshots.map((url: string, i: number) => ({
+        application_id: appId,
+        url,
+        sort_order: i,
+      }))
+    );
+  }
 
   // Notify all admins that the developer has made the requested changes
   if (wasChangesRequested) {
