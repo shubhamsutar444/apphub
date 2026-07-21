@@ -76,34 +76,47 @@ export async function submitAppAction(
 
   const isAdmin = user.profile.role === "admin";
 
-  const { data: app, error } = await supabase
+  const insertPayload: Record<string, unknown> = {
+    developer_id: developer.id,
+    name: parsed.data.name,
+    slug,
+    short_description: parsed.data.short_description,
+    full_description: parsed.data.full_description,
+    category_id: parsed.data.category_id,
+    current_version: parsed.data.version,
+    developer_website: parsed.data.developer_website || null,
+    privacy_policy_url: parsed.data.privacy_policy_url || null,
+    support_email: parsed.data.support_email || null,
+    tags: tagsArray,
+    publishing_plan: parsed.data.publishing_plan,
+    package_name: formData.get("package_name")?.toString() || null,
+    icon_url: iconUrl,
+    banner_url: bannerUrl,
+    apk_size_bytes: apkSizeBytes || null,
+    // Admin publishes instantly; regular devs go to pending_review
+    status: isAdmin ? "approved" : "pending_review",
+    published_at: isAdmin ? new Date().toISOString() : null,
+  };
+
+  let { data: app, error } = await supabase
     .from("applications")
-    .insert({
-      developer_id: developer.id,
-      name: parsed.data.name,
-      slug,
-      short_description: parsed.data.short_description,
-      full_description: parsed.data.full_description,
-      category_id: parsed.data.category_id,
-      current_version: parsed.data.version,
-      developer_website: parsed.data.developer_website || null,
-      privacy_policy_url: parsed.data.privacy_policy_url || null,
-      support_email: parsed.data.support_email || null,
-      tags: tagsArray,
-      publishing_plan: parsed.data.publishing_plan,
-      package_name: formData.get("package_name")?.toString() || null,
-      icon_url: iconUrl,
-      banner_url: bannerUrl,
-      apk_size_bytes: apkSizeBytes || null,
-      // Admin publishes instantly; regular devs go to pending_review
-      status: isAdmin ? "approved" : "pending_review",
-      published_at: isAdmin ? new Date().toISOString() : null,
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
 
-  if (error) {
-    return { error: error.message };
+  if (error && error.message?.includes("package_name")) {
+    delete insertPayload.package_name;
+    const retry = await supabase
+      .from("applications")
+      .insert(insertPayload)
+      .select("id")
+      .single();
+    app = retry.data;
+    error = retry.error;
+  }
+
+  if (error || !app) {
+    return { error: error?.message ?? "Failed to create application" };
   }
 
   // Save APK version record
@@ -223,15 +236,30 @@ export async function updateAppAction(
   const newPackageName = formData.get("package_name")?.toString()?.trim() || null;
 
   // 1. Fetch current app using adminClient (bypasses RLS blocks)
-  const { data: currentApp, error: fetchErr } = await adminClient
+  let currentApp: { id: string; name: string; status: string; developer_id: string; package_name?: string | null } | null = null;
+
+  const { data: fetchedApp, error: fetchErr } = await adminClient
     .from("applications")
     .select("id, name, status, developer_id, package_name")
     .eq("id", appId)
     .maybeSingle();
 
   if (fetchErr) {
-    console.error("Error fetching app in updateAppAction:", fetchErr);
-    return { error: `Database error: ${fetchErr.message}` };
+    if (fetchErr.message?.includes("package_name")) {
+      // Fallback query if package_name column does not exist in DB yet
+      const { data: fallbackApp, error: fallbackErr } = await adminClient
+        .from("applications")
+        .select("id, name, status, developer_id")
+        .eq("id", appId)
+        .maybeSingle();
+
+      if (fallbackErr) return { error: `Database error: ${fallbackErr.message}` };
+      currentApp = fallbackApp;
+    } else {
+      return { error: `Database error: ${fetchErr.message}` };
+    }
+  } else {
+    currentApp = fetchedApp;
   }
 
   if (!currentApp) {
@@ -263,24 +291,37 @@ export async function updateAppAction(
   // move status back to pending_review so admin can review again
   const wasChangesRequested = currentApp.status === "changes_requested";
 
-  const { error } = await adminClient
+  const updatePayload: Record<string, unknown> = {
+    name: parsed.data.name,
+    short_description: parsed.data.short_description,
+    full_description: parsed.data.full_description,
+    category_id: parsed.data.category_id,
+    current_version: parsed.data.version,
+    developer_website: parsed.data.developer_website || null,
+    tags: tagsArray,
+    ...(newIconUrl ? { icon_url: newIconUrl } : {}),
+    ...(newBannerUrl ? { banner_url: newBannerUrl } : {}),
+    ...(wasChangesRequested ? { status: "pending_review", admin_notes: null } : {}),
+  };
+
+  if (newPackageName) {
+    updatePayload.package_name = newPackageName;
+  }
+
+  let { error } = await adminClient
     .from("applications")
-    .update({
-      name: parsed.data.name,
-      short_description: parsed.data.short_description,
-      full_description: parsed.data.full_description,
-      category_id: parsed.data.category_id,
-      current_version: parsed.data.version,
-      developer_website: parsed.data.developer_website || null,
-      tags: tagsArray,
-      ...(newPackageName ? { package_name: newPackageName } : {}),
-      // Update file URLs only if new ones were uploaded
-      ...(newIconUrl ? { icon_url: newIconUrl } : {}),
-      ...(newBannerUrl ? { banner_url: newBannerUrl } : {}),
-      // Automatically re-submit for review when changes are made
-      ...(wasChangesRequested ? { status: "pending_review", admin_notes: null } : {}),
-    })
+    .update(updatePayload)
     .eq("id", appId);
+
+  if (error && error.message?.includes("package_name")) {
+    // Retry update without package_name if column not in DB schema yet
+    delete updatePayload.package_name;
+    const retry = await adminClient
+      .from("applications")
+      .update(updatePayload)
+      .eq("id", appId);
+    error = retry.error;
+  }
 
   if (error) return { error: error.message };
 
