@@ -91,6 +91,7 @@ export async function submitAppAction(
       support_email: parsed.data.support_email || null,
       tags: tagsArray,
       publishing_plan: parsed.data.publishing_plan,
+      package_name: formData.get("package_name")?.toString() || null,
       icon_url: iconUrl,
       banner_url: bannerUrl,
       apk_size_bytes: apkSizeBytes || null,
@@ -219,14 +220,23 @@ export async function updateAppAction(
     try { newScreenshots = JSON.parse(screenshotsRaw); } catch { newScreenshots = null; }
   }
 
-  // First fetch the current app status so we know if it was "changes_requested"
+  const newPackageName = formData.get("package_name")?.toString()?.trim() || null;
+
+  // First fetch the current app status and package_name
   const { data: currentApp } = await supabase
     .from("applications")
-    .select("id, name, status, developer_id")
+    .select("id, name, status, developer_id, package_name")
     .eq("id", appId)
     .single();
 
   if (!currentApp) return { error: "App not found" };
+
+  // Package Name Lockdown Check: Prevent replacing this app with a completely different APK
+  if (currentApp.package_name && newPackageName && newPackageName.toLowerCase() !== currentApp.package_name.toLowerCase()) {
+    return {
+      error: `❌ Package name mismatch! The uploaded APK package name ("${newPackageName}") does not match this app's registered package name ("${currentApp.package_name}"). You cannot replace an existing app with a completely different application.`
+    };
+  }
 
   // If developer is submitting changes that were requested by admin,
   // move status back to pending_review so admin can review again
@@ -241,9 +251,8 @@ export async function updateAppAction(
       category_id: parsed.data.category_id,
       current_version: parsed.data.version,
       developer_website: parsed.data.developer_website || null,
-      privacy_policy_url: parsed.data.privacy_policy_url || null,
-      support_email: parsed.data.support_email || null,
       tags: tagsArray,
+      ...(newPackageName ? { package_name: newPackageName } : {}),
       // Update file URLs only if new ones were uploaded
       ...(newIconUrl ? { icon_url: newIconUrl } : {}),
       ...(newBannerUrl ? { banner_url: newBannerUrl } : {}),

@@ -10,6 +10,7 @@ export const appSubmissionSchema = z.object({
   privacy_policy_url: z.string().url("Enter a valid URL").optional().or(z.literal("")),
   support_email: z.string().email("Enter a valid email").optional().or(z.literal("")),
   tags: z.string().optional(),
+  package_name: z.string().optional(),
   publishing_plan: z.enum(["basic", "priority", "featured"]),
 });
 

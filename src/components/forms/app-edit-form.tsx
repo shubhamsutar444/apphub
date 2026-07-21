@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { updateAppAction } from "@/lib/actions/apps";
 import { uploadFileDirect } from "@/lib/utils/upload-client";
+import { extractApkPackageName } from "@/lib/utils/apk-parser";
 import { createClient } from "@/lib/supabase/client";
 import type { Application, ApplicationScreenshot, Category } from "@/types";
 
@@ -237,8 +238,37 @@ export function AppEditForm({
   const [apkUrl, setApkUrl] = useState("");
   const [apkPath, setApkPath] = useState("");
   const [apkName, setApkName] = useState("");
+  const [apkPackageName, setApkPackageName] = useState("");
   const [apkUploading, setApkUploading] = useState(false);
   const [apkError, setApkError] = useState("");
+
+  const uploadApkWithValidation = async (file: File) => {
+    setApkUploading(true);
+    setApkError("");
+
+    // Extract package name from newly selected APK
+    const newPkg = await extractApkPackageName(file);
+
+    if (app.package_name && newPkg && newPkg.toLowerCase() !== app.package_name.toLowerCase()) {
+      setApkUploading(false);
+      setApkError(
+        `❌ Package name mismatch! The uploaded APK belongs to "${newPkg}", but this app is registered as "${app.package_name}". You cannot replace this app with a completely different application.`
+      );
+      return;
+    }
+
+    if (newPkg) setApkPackageName(newPkg);
+
+    const result = await uploadFileDirect(file, "app-apks", userId);
+    setApkUploading(false);
+    if (result.error) {
+      setApkError(result.error);
+      return;
+    }
+    setApkUrl(result.url!);
+    setApkPath(result.url!);
+    setApkName(file.name);
+  };
 
   // Screenshots
   const [existingSS, setExistingSS] = useState<ApplicationScreenshot[]>(existingScreenshots);
@@ -272,6 +302,7 @@ export function AppEditForm({
     <form action={formAction} className="space-y-6">
       {/* Hidden fields */}
       <input type="hidden" name="app_id" value={app.id} />
+      <input type="hidden" name="package_name" value={apkPackageName || app.package_name || ""} />
       <input type="hidden" name="icon_url" value={iconUrl} />
       <input type="hidden" name="banner_url" value={bannerUrl} />
       <input type="hidden" name="apk_url" value={apkUrl} />
@@ -352,9 +383,7 @@ export function AppEditForm({
               label="APK File"
               accept=".apk"
               hint="Upload new version · max 150 MB"
-              onUpload={(f) => upload(f, "app-apks",
-                (u) => { setApkUrl(u); setApkPath(u); },
-                setApkName, setApkUploading, setApkError)}
+              onUpload={uploadApkWithValidation}
               uploading={apkUploading}
               uploadedUrl={apkUrl}
               fileName={apkName}

@@ -84,6 +84,7 @@ export interface Application {
   is_editors_choice: boolean;
   is_trending: boolean;
   publishing_plan: PublishingPlan | null;
+  package_name: string | null;
   rejection_reason: string | null;
   admin_notes: string | null;
   published_at: string | null;

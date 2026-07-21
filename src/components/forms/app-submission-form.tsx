@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { submitAppAction } from "@/lib/actions/apps";
 import { uploadFileDirect } from "@/lib/utils/upload-client";
+import { extractApkPackageName } from "@/lib/utils/apk-parser";
 import { createClient } from "@/lib/supabase/client";
 import { SubmitPaymentModal } from "@/components/forms/submit-payment-modal";
 import type { Category } from "@/types";
@@ -200,6 +201,7 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
   const [apkUrl, setApkUrl] = useState("");
   const [apkPath, setApkPath] = useState("");
   const [apkName, setApkName] = useState("");
+  const [packageName, setPackageName] = useState("");
   const [apkSizeBytes, setApkSizeBytes] = useState(0);
   const [apkUploading, setApkUploading] = useState(false);
   const [apkError, setApkError] = useState("");
@@ -221,6 +223,13 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
     setApkUploading(true);
     setApkError("");
     setApkProgress(10);
+
+    // Extract package name from APK ZIP
+    const extractedPkg = await extractApkPackageName(file);
+    if (extractedPkg) {
+      setPackageName(extractedPkg);
+    }
+
     const result = await uploadFileDirect(file, "app-apks", userId);
     setApkProgress(100);
     setApkUploading(false);
@@ -329,6 +338,7 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
     <>
       <form ref={formRef} action={formAction} className="space-y-8">
         {/* Hidden fields for uploaded files */}
+        <input type="hidden" name="package_name" value={packageName} />
         <input type="hidden" name="apk_url" value={apkUrl} />
         <input type="hidden" name="apk_path" value={apkPath} />
         <input type="hidden" name="apk_size_bytes" value={apkSizeBytes} />
