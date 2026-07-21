@@ -59,6 +59,15 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-store" },
         ],
       },
+      // Manifest file CORS & content type
+      {
+        source: "/manifest.json",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET" },
+          { key: "Content-Type", value: "application/manifest+json" },
+        ],
+      },
       // Security headers on all pages
       {
         source: "/(.*)",
