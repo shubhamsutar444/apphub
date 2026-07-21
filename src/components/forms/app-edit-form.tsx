@@ -307,7 +307,7 @@ export function AppEditForm({
       <input type="hidden" name="banner_url" value={bannerUrl} />
       <input type="hidden" name="apk_url" value={apkUrl} />
       <input type="hidden" name="apk_path" value={apkPath} />
-      <input type="hidden" name="apk_version" value={apkUrl ? (document?.querySelector<HTMLInputElement>('[name="version"]')?.value ?? "") : ""} />
+      <input type="hidden" name="apk_version" value={app.current_version ?? "1.0.0"} />
       {allScreenshotUrls.length > 0 && (
         <input type="hidden" name="screenshots" value={JSON.stringify(allScreenshotUrls)} />
       )}

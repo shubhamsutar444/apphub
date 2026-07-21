@@ -327,7 +327,9 @@ export async function updateAppAction(
   if (error) return { error: error.message };
 
   // Save new APK version if uploaded
-  if (newApkUrl && newApkVersion) {
+  if (newApkUrl) {
+    const versionString = parsed.data.version || newApkVersion || "1.0.0";
+
     // Deactivate old versions
     await adminClient
       .from("application_versions")
@@ -336,7 +338,7 @@ export async function updateAppAction(
 
     await adminClient.from("application_versions").insert({
       application_id: appId,
-      version: newApkVersion,
+      version: versionString,
       apk_path: newApkUrl,
       apk_size_bytes: 0,
       is_active: true,
@@ -364,7 +366,6 @@ export async function updateAppAction(
   // Notify all admins that the developer has made the requested changes
   if (wasChangesRequested) {
     try {
-      const adminClient = createAdminClient();
       const { data: admins } = await adminClient
         .from("users")
         .select("id")
@@ -388,7 +389,10 @@ export async function updateAppAction(
   }
 
   revalidatePath("/dashboard/developer/apps");
+  revalidatePath(`/dashboard/developer/apps/${appId}/edit`);
   revalidatePath(`/dashboard/admin/apps`);
+  revalidatePath(`/dashboard/admin/apps/${appId}`);
+  revalidatePath("/marketplace");
 
   return {
     success: wasChangesRequested
