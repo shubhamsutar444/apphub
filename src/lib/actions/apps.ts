@@ -204,7 +204,7 @@ export async function updateAppAction(
     return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createClient();
+  const adminClient = createAdminClient();
   const tagsArray = parsed.data.tags
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
@@ -222,16 +222,30 @@ export async function updateAppAction(
 
   const newPackageName = formData.get("package_name")?.toString()?.trim() || null;
 
-  // First fetch the current app status and package_name
-  const { data: currentApp } = await supabase
+  // 1. Fetch current app using adminClient (bypasses RLS blocks)
+  const { data: currentApp } = await adminClient
     .from("applications")
     .select("id, name, status, developer_id, package_name")
     .eq("id", appId)
-    .single();
+    .maybeSingle();
 
   if (!currentApp) return { error: "App not found" };
 
-  // Package Name Lockdown Check: Prevent replacing this app with a completely different APK
+  // 2. Authorization check: ensure user owns this application or is admin
+  const isAdmin = user.profile?.role === "admin";
+  if (!isAdmin) {
+    const { data: dev } = await adminClient
+      .from("developers")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!dev || currentApp.developer_id !== dev.id) {
+      return { error: "Unauthorized to edit this application." };
+    }
+  }
+
+  // 3. Package Name Security Lockdown Check: Prevent replacing this app with a completely different APK
   if (currentApp.package_name && newPackageName && newPackageName.toLowerCase() !== currentApp.package_name.toLowerCase()) {
     return {
       error: `❌ Package name mismatch! The uploaded APK package name ("${newPackageName}") does not match this app's registered package name ("${currentApp.package_name}"). You cannot replace an existing app with a completely different application.`
@@ -242,7 +256,7 @@ export async function updateAppAction(
   // move status back to pending_review so admin can review again
   const wasChangesRequested = currentApp.status === "changes_requested";
 
-  const { error } = await supabase
+  const { error } = await adminClient
     .from("applications")
     .update({
       name: parsed.data.name,
@@ -266,12 +280,12 @@ export async function updateAppAction(
   // Save new APK version if uploaded
   if (newApkUrl && newApkVersion) {
     // Deactivate old versions
-    await supabase
+    await adminClient
       .from("application_versions")
       .update({ is_active: false })
       .eq("application_id", appId);
 
-    await supabase.from("application_versions").insert({
+    await adminClient.from("application_versions").insert({
       application_id: appId,
       version: newApkVersion,
       apk_path: newApkUrl,
@@ -283,13 +297,13 @@ export async function updateAppAction(
   // Replace screenshots if new ones were provided
   if (newScreenshots && newScreenshots.length > 0) {
     // Delete old screenshots
-    await supabase
+    await adminClient
       .from("application_screenshots")
       .delete()
       .eq("application_id", appId);
 
     // Insert new ones
-    await supabase.from("application_screenshots").insert(
+    await adminClient.from("application_screenshots").insert(
       newScreenshots.map((url: string, i: number) => ({
         application_id: appId,
         url,
