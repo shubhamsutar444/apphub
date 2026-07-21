@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle, Upload, Loader2, Copy, Check,
-  ArrowRight, Shield, Gift, Star, Crown, X, ArrowLeft, AlertCircle
+  ArrowRight, Shield, Star, Crown, X, ArrowLeft, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadFileDirect } from "@/lib/utils/upload-client";
@@ -14,9 +14,8 @@ interface SubmitPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
-  isFirstTime: boolean;
   onFinalSubmit: (payload: {
-    plan: "starter" | "basic" | "featured";
+    plan: "basic" | "featured";
     amountPaise: number;
     screenshotUrl: string;
   }) => Promise<void>;
@@ -25,7 +24,7 @@ interface SubmitPaymentModalProps {
 }
 
 interface Plan {
-  id: "starter" | "basic" | "featured";
+  id: "basic" | "featured";
   name: string;
   priceNumber: number;
   displayPrice: string;
@@ -42,15 +41,12 @@ export function SubmitPaymentModal({
   isOpen,
   onClose,
   userId,
-  isFirstTime,
   onFinalSubmit,
   isSubmitting,
   submitError,
 }: SubmitPaymentModalProps) {
   const [step, setStep] = useState<"select" | "pay" | "upload" | "done">("select");
-  const [selectedPlanId, setSelectedPlanId] = useState<Plan["id"]>(
-    isFirstTime ? "starter" : "basic"
-  );
+  const [selectedPlanId, setSelectedPlanId] = useState<Plan["id"]>("basic");
   const [copied, setCopied] = useState(false);
   const [screenshotUrl, setScreenshotUrl] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -60,33 +56,15 @@ export function SubmitPaymentModal({
   if (!isOpen) return null;
 
   const plans: Plan[] = [
-    ...(isFirstTime
-      ? [
-          {
-            id: "starter" as const,
-            name: "First App",
-            priceNumber: 1,
-            displayPrice: "₹1",
-            badge: "🎁 First-Time Offer",
-            icon: <Gift className="h-5 w-5" />,
-            features: [
-              "Exclusive for first published app",
-              "Standard listing",
-              "24–72h review time",
-              "Full analytics access",
-            ],
-            highlight: true,
-          },
-        ]
-      : []),
     {
       id: "basic",
       name: "Standard",
       priceNumber: 99,
       displayPrice: "₹99",
+      badge: "Popular",
       icon: <Star className="h-5 w-5" />,
       features: ["Standard listing", "24–72h review", "App analytics", "Community support"],
-      highlight: !isFirstTime,
+      highlight: true,
     },
     {
       id: "featured",

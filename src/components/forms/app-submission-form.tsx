@@ -165,22 +165,14 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(submitAppAction, {});
 
-  // Current user & first-time publisher check
+  // Current user ID
   const [userId, setUserId] = useState("");
-  const [isFirstTime, setIsFirstTime] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
+    supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setUserId(data.user.id);
-        const { count } = await supabase
-          .from("payments")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", data.user.id)
-          .eq("status", "paid");
-
-        setIsFirstTime((count ?? 0) === 0);
       }
     });
   }, []);
@@ -190,7 +182,7 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
   const [validationError, setValidationError] = useState("");
 
   // Submitted plan payload values
-  const [chosenPlan, setChosenPlan] = useState<"starter" | "basic" | "featured">("basic");
+  const [chosenPlan, setChosenPlan] = useState<"basic" | "featured">("basic");
   const [chosenAmountPaise, setChosenAmountPaise] = useState(9900);
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState("");
 
@@ -288,7 +280,7 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
 
   // Called when developer completes modal (Step 3 -> Step 4)
   const handleFinalSubmitFromModal = async (payload: {
-    plan: "starter" | "basic" | "featured";
+    plan: "basic" | "featured";
     amountPaise: number;
     screenshotUrl: string;
   }) => {
@@ -495,7 +487,6 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         userId={userId}
-        isFirstTime={isFirstTime}
         onFinalSubmit={handleFinalSubmitFromModal}
         isSubmitting={pending}
         submitError={state.error ?? ""}

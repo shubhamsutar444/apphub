@@ -269,29 +269,13 @@ export function CategoriesSection({ categories }: { categories?: Category[] }) {
 export function PublishingPlansSection() {
   const plans = [
     {
-      name: "Starter",
-      price: "₹1",
+      name: "Standard",
+      price: "₹99",
       period: "per app",
       highlight: true,
       active: true,
-      badge: "🎉 First-Time Offer",
-      cta: "Choose Starter (₹1)",
-      features: [
-        "First-time publishers only",
-        "Standard listing",
-        "24–72h review time",
-        "App analytics",
-        "Unlimited updates",
-      ],
-    },
-    {
-      name: "Basic",
-      price: "₹99",
-      period: "per app",
-      highlight: false,
-      active: true,
-      badge: "Standard",
-      cta: "Choose Basic (₹99)",
+      badge: "Popular",
+      cta: "Publish for ₹99",
       features: [
         "Standard listing",
         "24–72h review time",
@@ -301,35 +285,19 @@ export function PublishingPlansSection() {
       ],
     },
     {
-      name: "Priority",
-      price: "₹299",
-      period: "per app",
-      highlight: false,
-      active: true,
-      badge: "🔥 Popular",
-      cta: "Choose Priority (₹299)",
-      features: [
-        "Highlighted listing",
-        "12–24h review time",
-        "Advanced analytics",
-        "Priority support",
-        "Badge on listing",
-      ],
-    },
-    {
       name: "Featured",
-      price: "₹999",
+      price: "₹199",
       period: "per app",
       highlight: false,
       active: true,
-      badge: "⭐ Featured",
-      cta: "Choose Featured (₹999)",
+      badge: "⭐ Recommended",
+      cta: "Featured for ₹199",
       features: [
         "Homepage featured slot",
         "6–12h review time",
         "Premium analytics",
         "Dedicated support",
-        "Newsletter mention",
+        "Badge on listing",
       ],
     },
   ];
@@ -337,7 +305,7 @@ export function PublishingPlansSection() {
   return (
     <section className="section-container py-20">
       <SectionHeader title="Simple, Affordable Pricing" subtitle="Publish your app and reach thousands of users" />
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-8 max-w-2xl mx-auto sm:grid-cols-2">
         {plans.map((plan, i) => (
           <motion.div
             key={plan.name}
