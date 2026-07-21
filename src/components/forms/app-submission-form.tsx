@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useRef, useEffect } from "react";
 import {
-  Loader2, Info, Upload, X, CheckCircle, FileText, Image as ImageIcon,
+  Loader2, Upload, X, CheckCircle, FileText, Image as ImageIcon, ArrowRight, ShieldCheck
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -13,17 +13,11 @@ import { Card } from "@/components/ui/card";
 import { submitAppAction } from "@/lib/actions/apps";
 import { uploadFileDirect } from "@/lib/utils/upload-client";
 import { createClient } from "@/lib/supabase/client";
+import { SubmitPaymentModal } from "@/components/forms/submit-payment-modal";
 import type { Category } from "@/types";
-
-const PLANS = [
-  { id: "basic" as const,    name: "Basic",    price: "₹99",  desc: "Standard listing · 24–72h review" },
-  { id: "priority" as const, name: "Priority", price: "₹299", desc: "Highlighted · 12–24h review" },
-  { id: "featured" as const, name: "Featured", price: "₹999", desc: "Homepage feature · 6–12h review" },
-];
 
 interface AppSubmissionFormProps {
   categories: Category[];
-  defaultPlan?: "basic" | "priority" | "featured";
   isAdmin?: boolean;
 }
 
@@ -167,18 +161,38 @@ function ScreenshotsUpload({
   );
 }
 
-export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubmissionFormProps) {
-  const [selectedPlan, setSelectedPlan] = useState<"basic" | "priority" | "featured">(defaultPlan);
+export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmissionFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(submitAppAction, {});
 
-  // Get current user ID for upload paths
+  // Current user & first-time publisher check
   const [userId, setUserId] = useState("");
+  const [isFirstTime, setIsFirstTime] = useState(true);
+
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUserId(data.user.id);
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        setUserId(data.user.id);
+        const { count } = await supabase
+          .from("payments")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", data.user.id)
+          .eq("status", "paid");
+
+        setIsFirstTime((count ?? 0) === 0);
+      }
     });
   }, []);
+
+  // Modal & Selected Plan State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [validationError, setValidationError] = useState("");
+
+  // Submitted plan payload values
+  const [chosenPlan, setChosenPlan] = useState<"starter" | "basic" | "featured">("basic");
+  const [chosenAmountPaise, setChosenAmountPaise] = useState(9900);
+  const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState("");
 
   // File upload state
   const [apkUrl, setApkUrl] = useState("");
@@ -201,7 +215,6 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
   const [screenshots, setScreenshots] = useState<{ url: string; name: string }[]>([]);
   const [ssUploading, setSsUploading] = useState(false);
 
-  // Direct browser → Supabase upload (no server middleman = fast)
   const uploadApk = async (file: File) => {
     setApkUploading(true);
     setApkError("");
@@ -214,7 +227,7 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
     setApkUrl(result.url!);
     setApkPath(result.path!);
     setApkName(file.name);
-    setApkSizeBytes(result.sizeBytes ?? file.size); // auto-detect size
+    setApkSizeBytes(result.sizeBytes ?? file.size);
   };
 
   const uploadIcon = async (file: File) => {
@@ -248,242 +261,245 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
     setScreenshots((prev) => prev.filter((_, idx) => idx !== i));
   };
 
+  // Open modal if form fields are valid
+  const handleOpenModal = () => {
+    setValidationError("");
+    if (!apkUrl) {
+      setValidationError("Please upload your app's APK file first.");
+      return;
+    }
+    if (!iconUrl) {
+      setValidationError("Please upload your app's icon image first.");
+      return;
+    }
+    if (!formRef.current?.checkValidity()) {
+      formRef.current?.reportValidity();
+      return;
+    }
+
+    if (isAdmin) {
+      // Admin bypasses payment modal directly
+      formRef.current?.requestSubmit();
+      return;
+    }
+
+    setIsModalOpen(true);
+  };
+
+  // Called when developer completes modal (Step 3 -> Step 4)
+  const handleFinalSubmitFromModal = async (payload: {
+    plan: "starter" | "basic" | "featured";
+    amountPaise: number;
+    screenshotUrl: string;
+  }) => {
+    setChosenPlan(payload.plan);
+    setChosenAmountPaise(payload.amountPaise);
+    setPaymentScreenshotUrl(payload.screenshotUrl);
+
+    // Wait for state to sync and trigger form submission
+    setTimeout(() => {
+      if (formRef.current) {
+        const formData = new FormData(formRef.current);
+        formData.set("publishing_plan", payload.plan);
+        formData.set("payment_amount_paise", payload.amountPaise.toString());
+        formData.set("payment_screenshot_url", payload.screenshotUrl);
+        formAction(formData);
+      }
+    }, 100);
+  };
+
   return (
-    <form action={formAction} className="space-y-8">
-      {/* Hidden fields for uploaded files */}
-      <input type="hidden" name="apk_url" value={apkUrl} />
-      <input type="hidden" name="apk_path" value={apkPath} />
-      <input type="hidden" name="apk_size_bytes" value={apkSizeBytes} />
-      <input type="hidden" name="icon_url" value={iconUrl} />
-      <input type="hidden" name="banner_url" value={bannerUrl} />
-      <input type="hidden" name="screenshots" value={JSON.stringify(screenshots.map((s) => s.url))} />
-      <input type="hidden" name="publishing_plan" value={selectedPlan} />
+    <>
+      <form ref={formRef} action={formAction} className="space-y-8">
+        {/* Hidden fields for uploaded files */}
+        <input type="hidden" name="apk_url" value={apkUrl} />
+        <input type="hidden" name="apk_path" value={apkPath} />
+        <input type="hidden" name="apk_size_bytes" value={apkSizeBytes} />
+        <input type="hidden" name="icon_url" value={iconUrl} />
+        <input type="hidden" name="banner_url" value={bannerUrl} />
+        <input type="hidden" name="screenshots" value={JSON.stringify(screenshots.map((s) => s.url))} />
+        <input type="hidden" name="publishing_plan" value={chosenPlan} />
+        <input type="hidden" name="payment_amount_paise" value={chosenAmountPaise} />
+        <input type="hidden" name="payment_screenshot_url" value={paymentScreenshotUrl} />
 
-      {state.error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          {state.error}
-        </div>
-      )}
+        {(state.error || validationError) && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {state.error || validationError}
+          </div>
+        )}
 
-      {/* ── App Info ─────────────────────────────────────────────── */}
-      <Card>
-        <h2 className="mb-6 font-heading text-lg font-semibold">App Information</h2>
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                App Name <span className="text-red-400">*</span>
-              </label>
-              <Input name="name" placeholder="My Awesome App" required maxLength={100} />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Category <span className="text-red-400">*</span>
-              </label>
-              <Select name="category_id" required>
-                <option value="">Select a category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              Short Description <span className="text-red-400">*</span>
-            </label>
-            <Input name="short_description" placeholder="One-liner tagline (max 200 chars)" required maxLength={200} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              Full Description <span className="text-red-400">*</span>
-            </label>
-            <Textarea name="full_description" placeholder="Detailed description of your app..." rows={5} required minLength={50} maxLength={5000} />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Version <span className="text-red-400">*</span>
-              </label>
-              <Input name="version" placeholder="1.0.0" required maxLength={20} />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium">Tags</label>
-              <Input name="tags" placeholder="utility, free, offline (comma separated)" />
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* ── File Uploads ──────────────────────────────────────────── */}
-      <Card>
-        <h2 className="mb-6 font-heading text-lg font-semibold">App Files & Assets</h2>
-        <div className="space-y-6">
-
-          {/* APK */}
-          <div>
-            <FileUploadZone
-              label="APK File *"
-              accept=".apk"
-              hint=".apk only · max 150 MB · uploads directly to storage"
-              onUpload={uploadApk}
-              uploading={apkUploading}
-              uploadedUrl={apkUrl}
-              fileName={apkName}
-            />
-            {apkUploading && apkProgress > 0 && (
-              <div className="mt-2">
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300 animate-pulse"
-                    style={{ width: `${apkProgress}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-primary">Uploading directly to storage...</p>
+        {/* ── App Info ─────────────────────────────────────────────── */}
+        <Card>
+          <h2 className="mb-6 font-heading text-lg font-semibold">App Information</h2>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  App Name <span className="text-red-400">*</span>
+                </label>
+                <Input name="name" placeholder="My Awesome App" required maxLength={100} />
               </div>
-            )}
-            {apkError && <p className="mt-1 text-xs text-red-400">{apkError}</p>}
-            {!apkUrl && !apkUploading && (
-              <p className="mt-1 text-xs text-secondary-500">APK required · uploads go directly from your browser to storage (fast)</p>
-            )}
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Category <span className="text-red-400">*</span>
+                </label>
+                <Select name="category_id" required>
+                  <option value="">Select a category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Short Description <span className="text-red-400">*</span>
+              </label>
+              <Input name="short_description" placeholder="One-liner tagline (max 200 chars)" required maxLength={200} />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Full Description <span className="text-red-400">*</span>
+              </label>
+              <Textarea name="full_description" placeholder="Detailed description of your app..." rows={5} required minLength={50} maxLength={5000} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Version <span className="text-red-400">*</span>
+                </label>
+                <Input name="version" placeholder="1.0.0" required maxLength={20} />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Tags</label>
+                <Input name="tags" placeholder="utility, free, offline (comma separated)" />
+              </div>
+            </div>
           </div>
+        </Card>
 
-          <div className="grid gap-6 sm:grid-cols-2">
-            {/* Icon */}
+        {/* ── File Uploads ──────────────────────────────────────────── */}
+        <Card>
+          <h2 className="mb-6 font-heading text-lg font-semibold">App Files & Assets</h2>
+          <div className="space-y-6">
             <div>
               <FileUploadZone
-                label="App Icon *"
-                accept="image/*"
-                hint="512×512 PNG recommended · max 2 MB"
-                onUpload={uploadIcon}
-                uploading={iconUploading}
-                uploadedUrl={iconUrl}
-                fileName={iconName}
+                label="APK File *"
+                accept=".apk"
+                hint=".apk only · max 150 MB · uploads directly to storage"
+                onUpload={uploadApk}
+                uploading={apkUploading}
+                uploadedUrl={apkUrl}
+                fileName={apkName}
               />
-              {iconError && <p className="mt-1 text-xs text-red-400">{iconError}</p>}
+              {apkUploading && apkProgress > 0 && (
+                <div className="mt-2">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300 animate-pulse"
+                      style={{ width: `${apkProgress}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-primary">Uploading directly to storage...</p>
+                </div>
+              )}
+              {apkError && <p className="mt-1 text-xs text-red-400">{apkError}</p>}
+              {!apkUrl && !apkUploading && (
+                <p className="mt-1 text-xs text-secondary-500">APK required · uploads go directly from your browser to storage (fast)</p>
+              )}
             </div>
 
-            {/* Banner */}
-            <FileUploadZone
-              label="Banner Image (optional)"
-              accept="image/*"
-              hint="1024×500 PNG recommended · max 5 MB"
-              onUpload={uploadBanner}
-              uploading={bannerUploading}
-              uploadedUrl={bannerUrl}
-              fileName={bannerName}
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <FileUploadZone
+                  label="App Icon *"
+                  accept="image/*"
+                  hint="512×512 PNG recommended · max 2 MB"
+                  onUpload={uploadIcon}
+                  uploading={iconUploading}
+                  uploadedUrl={iconUrl}
+                  fileName={iconName}
+                />
+                {iconError && <p className="mt-1 text-xs text-red-400">{iconError}</p>}
+              </div>
+
+              <FileUploadZone
+                label="Banner Image (optional)"
+                accept="image/*"
+                hint="1024×500 PNG recommended · max 5 MB"
+                onUpload={uploadBanner}
+                uploading={bannerUploading}
+                uploadedUrl={bannerUrl}
+                fileName={bannerName}
+              />
+            </div>
+
+            <ScreenshotsUpload
+              screenshots={screenshots}
+              onAdd={addScreenshot}
+              onRemove={removeScreenshot}
+              uploading={ssUploading}
             />
           </div>
+        </Card>
 
-          {/* Screenshots */}
-          <ScreenshotsUpload
-            screenshots={screenshots}
-            onAdd={addScreenshot}
-            onRemove={removeScreenshot}
-            uploading={ssUploading}
-          />
-        </div>
-      </Card>
+        {/* ── Links ─────────────────────────────────────────────────── */}
+        <Card>
+          <h2 className="mb-6 font-heading text-lg font-semibold">Links & Contact</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium">Developer Website</label>
+              <Input name="developer_website" type="url" placeholder="https://yourwebsite.com" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">Privacy Policy URL</label>
+              <Input name="privacy_policy_url" type="url" placeholder="https://yourwebsite.com/privacy" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">Support Email</label>
+              <Input name="support_email" type="email" placeholder="support@yourapp.com" />
+            </div>
+          </div>
+        </Card>
 
-      {/* ── Links ─────────────────────────────────────────────────── */}
-      <Card>
-        <h2 className="mb-6 font-heading text-lg font-semibold">Links & Contact</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium">Developer Website</label>
-            <Input name="developer_website" type="url" placeholder="https://yourwebsite.com" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Privacy Policy URL</label>
-            <Input name="privacy_policy_url" type="url" placeholder="https://yourwebsite.com/privacy" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Support Email</label>
-            <Input name="support_email" type="email" placeholder="support@yourapp.com" />
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Plan ──────────────────────────────────────────────────── */}
-      <Card>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <div>
-            <h2 className="font-heading text-lg font-semibold">Publishing Plan</h2>
-            <p className="text-sm text-secondary-400">Select your preferred listing tier</p>
-          </div>
-          <a
-            href="/publish"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+        {/* ── Submit CTA ────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <p className="text-sm text-secondary-500">
+            By submitting, you agree to AppHub&apos;s developer policies.
+          </p>
+          <Button
+            type="button"
+            size="lg"
+            onClick={handleOpenModal}
+            disabled={pending || !apkUrl || !iconUrl}
+            className="gap-2 shrink-0"
           >
-            💳 Pay via UPI QR Code & Upload Proof →
-          </a>
+            {pending ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Submitting...</>
+            ) : isAdmin ? (
+              <><ShieldCheck className="h-4 w-4" /> Publish Instantly (Admin)</>
+            ) : (
+              <>Submit for Review <ArrowRight className="h-4 w-4" /></>
+            )}
+          </Button>
         </div>
+        {(!apkUrl || !iconUrl) && (
+          <p className="text-xs text-yellow-400">
+            ⚠ Please upload the APK file and app icon before submitting.
+          </p>
+        )}
+      </form>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          {PLANS.map((plan) => (
-            <button
-              key={plan.id}
-              type="button"
-              onClick={() => setSelectedPlan(plan.id)}
-              className={`relative rounded-2xl border p-5 text-left transition-all ${
-                selectedPlan === plan.id
-                  ? "border-primary bg-primary/10 shadow-glow ring-1 ring-primary/30"
-                  : "border-white/10 bg-white/3 hover:border-primary/25"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-heading font-semibold text-white">{plan.name}</p>
-                {selectedPlan === plan.id && (
-                  <CheckCircle className="h-4 w-4 text-primary" />
-                )}
-              </div>
-              <p className="mt-1 font-heading text-2xl font-bold text-primary">{plan.price}</p>
-              <p className="mt-2 text-xs text-secondary-400">{plan.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-          <div className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <p className="text-xs text-secondary-300">
-              Selected plan: <strong className="text-primary">{PLANS.find(p => p.id === selectedPlan)?.name} ({PLANS.find(p => p.id === selectedPlan)?.price})</strong>. Your app will be submitted under this plan.
-            </p>
-          </div>
-          <a
-            href="/publish"
-            className="shrink-0 rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/25 transition-colors"
-          >
-            Pay {PLANS.find(p => p.id === selectedPlan)?.price} via UPI
-          </a>
-        </div>
-      </Card>
-
-      {/* Submit */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <p className="text-sm text-secondary-500">
-          By submitting, you agree to AppHub&apos;s developer policies.
-        </p>
-        <Button
-          type="submit"
-          size="lg"
-          disabled={pending || !apkUrl || !iconUrl}
-          className="gap-2 shrink-0"
-        >
-          {pending ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Submitting...</>
-          ) : (
-            <>Submit for Review</>
-          )}
-        </Button>
-      </div>
-      {(!apkUrl || !iconUrl) && (
-        <p className="text-xs text-yellow-400">
-          ⚠ Please upload the APK file and app icon before submitting.
-        </p>
-      )}
-    </form>
+      {/* Payment & Submission Modal */}
+      <SubmitPaymentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        userId={userId}
+        isFirstTime={isFirstTime}
+        onFinalSubmit={handleFinalSubmitFromModal}
+        isSubmitting={pending}
+        submitError={state.error ?? ""}
+      />
+    </>
   );
 }

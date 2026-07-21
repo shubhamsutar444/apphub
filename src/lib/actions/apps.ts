@@ -129,13 +129,27 @@ export async function submitAppAction(
 
   // Create payment record (skip for admin)
   if (!isAdmin) {
-    const planPrices = { basic: 9900, priority: 29900, featured: 99900 };
+    const rawAmountPaise = parseInt(formData.get("payment_amount_paise")?.toString() ?? "0") || 9900;
+    const paymentScreenshotUrl = formData.get("payment_screenshot_url")?.toString() || null;
+    const chosenPlan = parsed.data.publishing_plan || "basic";
+
+    const defaultPlanPrices: Record<string, number> = {
+      starter: 100,
+      basic: 9900,
+      priority: 19900,
+      featured: 19900,
+    };
+    const amountPaise = rawAmountPaise || defaultPlanPrices[chosenPlan] || 9900;
+
     await supabase.from("payments").insert({
       user_id: user.id,
       application_id: app.id,
-      plan: parsed.data.publishing_plan,
-      amount_paise: planPrices[parsed.data.publishing_plan],
+      plan: chosenPlan,
+      amount_paise: amountPaise,
       status: "pending",
+      metadata: paymentScreenshotUrl
+        ? { screenshot_url: paymentScreenshotUrl, manual_payment: true, amount_rupees: amountPaise / 100 }
+        : null,
     });
 
     // Notify admins about new submission
@@ -423,6 +437,12 @@ export async function approveAppAction(appId: string): Promise<AppActionState> {
 
   if (fetchError || !app) return { error: fetchError?.message ?? "App not found" };
 
+  // Update payment status to paid (verified)
+  await adminClient
+    .from("payments")
+    .update({ status: "paid" })
+    .eq("application_id", appId);
+
   // Get developer user_id
   const { data: dev } = await adminClient
     .from("developers")
@@ -468,6 +488,12 @@ export async function rejectAppAction(
     .single();
 
   if (error || !app) return { error: error?.message ?? "App not found" };
+
+  // Update payment status to rejected
+  await adminClient
+    .from("payments")
+    .update({ status: "rejected" })
+    .eq("application_id", appId);
 
   const { data: dev } = await adminClient
     .from("developers")

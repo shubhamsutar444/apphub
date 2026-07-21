@@ -262,7 +262,7 @@ export default async function AdminAppDetailPage({ params }: AdminAppDetailPageP
             {payment && (
               <Card>
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-secondary-500">
-                  Payment
+                  Payment Details
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -278,9 +278,34 @@ export default async function AdminAppDetailPage({ params }: AdminAppDetailPageP
                   <div className="flex justify-between">
                     <span className="text-secondary-500">Status</span>
                     <Badge variant={payment.status === "paid" ? "success" : "warning"}>
-                      {payment.status}
+                      {payment.status === "paid" ? "Verified & Paid" : "Pending Verification"}
                     </Badge>
                   </div>
+
+                  {payment.metadata?.screenshot_url && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <p className="text-xs font-semibold text-secondary-400 mb-2">Payment Proof Screenshot</p>
+                      <a
+                        href={payment.metadata.screenshot_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative block h-44 w-full overflow-hidden rounded-xl border border-primary/20 bg-black/40"
+                      >
+                        <Image
+                          src={payment.metadata.screenshot_url}
+                          alt="Payment Proof Screenshot"
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          sizes="(max-width: 768px) 100vw, 300px"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-night-900 flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3" /> View Fullscreen
+                          </span>
+                        </div>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </Card>
             )}
