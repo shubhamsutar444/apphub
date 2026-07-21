@@ -68,6 +68,14 @@ const nextConfig: NextConfig = {
           { key: "Content-Type", value: "application/manifest+json" },
         ],
       },
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET" },
+          { key: "Content-Type", value: "application/manifest+json" },
+        ],
+      },
       // Security headers on all pages
       {
         source: "/(.*)",

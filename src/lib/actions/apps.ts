@@ -185,7 +185,7 @@ export async function updateAppAction(
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
 
-  const appId = formData.get("app_id")?.toString();
+  const appId = formData.get("app_id")?.toString()?.trim();
   if (!appId) return { error: "App ID required" };
 
   const parsed = appSubmissionSchema.omit({ publishing_plan: true }).safeParse({
@@ -223,13 +223,20 @@ export async function updateAppAction(
   const newPackageName = formData.get("package_name")?.toString()?.trim() || null;
 
   // 1. Fetch current app using adminClient (bypasses RLS blocks)
-  const { data: currentApp } = await adminClient
+  const { data: currentApp, error: fetchErr } = await adminClient
     .from("applications")
     .select("id, name, status, developer_id, package_name")
     .eq("id", appId)
     .maybeSingle();
 
-  if (!currentApp) return { error: "App not found" };
+  if (fetchErr) {
+    console.error("Error fetching app in updateAppAction:", fetchErr);
+    return { error: `Database error: ${fetchErr.message}` };
+  }
+
+  if (!currentApp) {
+    return { error: `App not found (ID: ${appId})` };
+  }
 
   // 2. Authorization check: ensure user owns this application or is admin
   const isAdmin = user.profile?.role === "admin";
