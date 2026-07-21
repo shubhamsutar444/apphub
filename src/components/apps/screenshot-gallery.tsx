@@ -57,7 +57,13 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStart === null) return;
     const diff = touchStart - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 50) diff > 0 ? next() : prev();
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        next();
+      } else {
+        prev();
+      }
+    }
     setTouchStart(null);
   };
 
@@ -65,111 +71,127 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
   return (
     <>
-      {/* Thumbnail strip */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+      {/* Horizontal Screenshot Cards */}
+      <div className="flex gap-3 overflow-x-auto pb-3 pt-1 scrollbar-hide">
         {screenshots.map((ss, i) => (
           <button
             key={ss.id}
             type="button"
             onClick={() => openLightbox(i)}
-            className="group relative h-48 w-28 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10 transition-all hover:ring-2 hover:ring-primary/50 sm:h-56 sm:w-32"
+            className="group relative h-48 w-28 shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10 transition-all hover:ring-2 hover:ring-primary/60 sm:h-60 sm:w-34"
           >
             <Image
               src={ss.url}
               alt={`Screenshot ${i + 1}`}
               fill
-              className="object-cover transition-transform group-hover:scale-105"
-              sizes="128px"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              sizes="140px"
             />
-            {/* Zoom hint overlay */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/30 group-hover:opacity-100">
-              <ZoomIn className="h-6 w-6 text-white drop-shadow" />
+            {/* Zoom overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+              <ZoomIn className="h-7 w-7 text-white drop-shadow-md" />
             </div>
           </button>
         ))}
       </div>
 
-      {/* Lightbox */}
+      {/* Swipeable Fullscreen Lightbox Modal */}
       <AnimatePresence>
         {lightboxOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-black/95 p-4 backdrop-blur-md"
             onClick={closeLightbox}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={closeLightbox}
-              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            {/* Counter */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-4 py-1.5 text-sm text-white backdrop-blur">
-              {activeIndex + 1} / {screenshots.length}
+            {/* Header Toolbar */}
+            <div className="flex w-full items-center justify-between z-10 px-2 pt-2 sm:px-6">
+              <div className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold text-white backdrop-blur border border-white/10">
+                {activeIndex + 1} / {screenshots.length}
+              </div>
+              <button
+                type="button"
+                onClick={closeLightbox}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* Prev button */}
-            {screenshots.length > 1 && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); prev(); }}
-                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-all hover:bg-white/25"
+            {/* Main Interactive Swipeable Image Container */}
+            <div className="relative flex flex-1 items-center justify-center w-full my-auto">
+              {/* Prev Button */}
+              {screenshots.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); prev(); }}
+                  className="absolute left-2 sm:left-6 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-all hover:bg-white/25 hover:scale-110"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+              )}
+
+              {/* Swipeable Image */}
+              <motion.div
+                key={activeIndex}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(_e, { offset }) => {
+                  if (offset.x < -60) next();
+                  if (offset.x > 60) prev();
+                }}
+                className="relative cursor-grab active:cursor-grabbing flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
               >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-            )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={screenshots[activeIndex].url}
+                  alt={`Screenshot ${activeIndex + 1}`}
+                  className="max-h-[72vh] max-w-[85vw] md:max-h-[78vh] md:max-w-[420px] w-auto h-auto rounded-2xl object-contain shadow-2xl ring-1 ring-white/15 select-none"
+                />
+              </motion.div>
 
-            {/* Image */}
-            <motion.div
-              key={activeIndex}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="relative max-h-[85vh] max-w-[90vw] sm:max-w-[400px]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Image
-                src={screenshots[activeIndex].url}
-                alt={`Screenshot ${activeIndex + 1}`}
-                width={400}
-                height={800}
-                className="max-h-[85vh] w-auto rounded-2xl object-contain shadow-2xl"
-                priority
-              />
-            </motion.div>
+              {/* Next Button */}
+              {screenshots.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); next(); }}
+                  className="absolute right-2 sm:right-6 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-all hover:bg-white/25 hover:scale-110"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              )}
+            </div>
 
-            {/* Next button */}
+            {/* Bottom Carousel Navigation Bar */}
             {screenshots.length > 1 && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); next(); }}
-                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition-all hover:bg-white/25"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
-            )}
+              <div className="z-10 flex flex-col items-center gap-3 pb-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-2 max-w-[90vw] overflow-x-auto p-1 scrollbar-hide">
+                  {screenshots.map((ss, i) => (
+                    <button
+                      key={ss.id}
+                      type="button"
+                      onClick={() => setActiveIndex(i)}
+                      className={`relative h-14 w-9 shrink-0 overflow-hidden rounded-lg transition-all ${
+                        i === activeIndex
+                          ? "ring-2 ring-primary scale-105 opacity-100"
+                          : "opacity-40 hover:opacity-75"
+                      }`}
+                    >
+                      <Image src={ss.url} alt={`Thumb ${i + 1}`} fill className="object-cover" sizes="36px" />
+                    </button>
+                  ))}
+                </div>
 
-            {/* Dot indicators */}
-            {screenshots.length > 1 && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-                {screenshots.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setActiveIndex(i); }}
-                    className={`h-2 rounded-full transition-all ${
-                      i === activeIndex ? "w-6 bg-primary" : "w-2 bg-white/40"
-                    }`}
-                  />
-                ))}
+                <p className="text-[11px] text-secondary-400">Swipe or use arrows to navigate</p>
               </div>
             )}
           </motion.div>

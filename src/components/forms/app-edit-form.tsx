@@ -147,7 +147,7 @@ function ScreenshotsManager({
 }: {
   existing: ApplicationScreenshot[];
   added: { url: string; name: string }[];
-  onAdd: (f: File) => Promise<void>;
+  onAdd: (files: FileList | File[]) => Promise<void>;
   onRemoveExisting: (id: string) => void;
   onRemoveAdded: (i: number) => void;
   uploading: boolean;
@@ -158,7 +158,7 @@ function ScreenshotsManager({
   return (
     <div>
       <label className="mb-2 block text-sm font-medium">
-        Screenshots <span className="text-xs text-secondary-500">({total}/8)</span>
+        Screenshots <span className="text-xs text-secondary-500">({total}/8 · select multiple images at once)</span>
       </label>
       <div className="flex flex-wrap gap-3">
         {/* Existing */}
@@ -189,10 +189,19 @@ function ScreenshotsManager({
         {total < 8 && (
           <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
             className="flex h-28 w-16 flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/15 text-secondary-500 hover:border-primary/30 hover:text-primary transition-colors">
-            <input ref={inputRef} type="file" accept="image/*" className="hidden"
-              onChange={async (e) => { const f = e.target.files?.[0]; if (f) { await onAdd(f); e.target.value = ""; } }} />
-            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-            <span className="mt-1 text-[10px]">Add</span>
+            <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={async (e) => { const files = e.target.files; if (files && files.length > 0) { await onAdd(files); e.target.value = ""; } }} />
+            {uploading ? (
+              <div className="flex flex-col items-center gap-1">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-[9px] text-primary font-medium">Uploading</span>
+              </div>
+            ) : (
+              <>
+                <Upload className="h-5 w-5" />
+                <span className="mt-1 text-[10px]">Add Photos</span>
+              </>
+            )}
           </button>
         )}
       </div>
@@ -386,11 +395,20 @@ export function AppEditForm({
           <ScreenshotsManager
             existing={existingSS}
             added={addedSS}
-            onAdd={async (f) => {
+            onAdd={async (files) => {
+              const fileArray = Array.from(files).slice(0, 8 - (existingSS.length + addedSS.length));
+              if (fileArray.length === 0) return;
               setSsUploading(true);
-              const result = await uploadFileDirect(f, "app-screenshots", userId);
+              const uploads = await Promise.all(
+                fileArray.map(async (file) => {
+                  const result = await uploadFileDirect(file, "app-screenshots", userId);
+                  if (result.url) return { url: result.url, name: file.name };
+                  return null;
+                })
+              );
+              const valid = uploads.filter((u): u is { url: string; name: string } => u !== null);
+              setAddedSS((prev) => [...prev, ...valid]);
               setSsUploading(false);
-              if (!result.error) setAddedSS((prev) => [...prev, { url: result.url!, name: f.name }]);
             }}
             onRemoveExisting={(id) => setExistingSS((prev) => prev.filter((s) => s.id !== id))}
             onRemoveAdded={(i) => setAddedSS((prev) => prev.filter((_, idx) => idx !== i))}

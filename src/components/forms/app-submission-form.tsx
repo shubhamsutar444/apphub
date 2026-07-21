@@ -106,7 +106,7 @@ function ScreenshotsUpload({
   uploading,
 }: {
   screenshots: { url: string; name: string }[];
-  onAdd: (file: File) => Promise<void>;
+  onAdd: (files: FileList | File[]) => Promise<void>;
   onRemove: (i: number) => void;
   uploading: boolean;
 }) {
@@ -115,7 +115,7 @@ function ScreenshotsUpload({
   return (
     <div>
       <label className="mb-2 block text-sm font-medium">
-        Screenshots <span className="text-secondary-500 text-xs">(up to 8)</span>
+        Screenshots <span className="text-secondary-500 text-xs">(select up to 8 images at once)</span>
       </label>
       <div className="flex flex-wrap gap-3">
         {screenshots.map((ss, i) => (
@@ -144,19 +144,29 @@ function ScreenshotsUpload({
               ref={inputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) await onAdd(f);
+                const files = e.target.files;
+                if (files && files.length > 0) await onAdd(files);
                 e.target.value = "";
               }}
             />
-            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-            <span className="mt-1 text-[10px]">Add</span>
+            {uploading ? (
+              <div className="flex flex-col items-center gap-1">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-[9px] text-primary font-medium">Uploading</span>
+              </div>
+            ) : (
+              <>
+                <Upload className="h-5 w-5" />
+                <span className="mt-1 text-[10px]">Add Photos</span>
+              </>
+            )}
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs text-secondary-500">PNG/JPG, max 5MB each</p>
+      <p className="mt-1 text-xs text-secondary-500">PNG/JPG, max 5MB each. You can select multiple images at once.</p>
     </div>
   );
 }
@@ -241,12 +251,27 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
     setBannerName(file.name);
   };
 
-  const addScreenshot = async (file: File) => {
+  const addScreenshots = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).slice(0, 8 - screenshots.length);
+    if (fileArray.length === 0) return;
     setSsUploading(true);
-    const result = await uploadFileDirect(file, "app-screenshots", userId);
+
+    const uploads = await Promise.all(
+      fileArray.map(async (file) => {
+        const result = await uploadFileDirect(file, "app-screenshots", userId);
+        if (result.url) {
+          return { url: result.url, name: file.name };
+        }
+        return null;
+      })
+    );
+
+    const validUploads = uploads.filter(
+      (u): u is { url: string; name: string } => u !== null
+    );
+
+    setScreenshots((prev) => [...prev, ...validUploads]);
     setSsUploading(false);
-    if (result.error) return;
-    setScreenshots((prev) => [...prev, { url: result.url!, name: file.name }]);
   };
 
   const removeScreenshot = (i: number) => {
@@ -428,7 +453,7 @@ export function AppSubmissionForm({ categories, isAdmin = false }: AppSubmission
 
             <ScreenshotsUpload
               screenshots={screenshots}
-              onAdd={addScreenshot}
+              onAdd={addScreenshots}
               onRemove={removeScreenshot}
               uploading={ssUploading}
             />
