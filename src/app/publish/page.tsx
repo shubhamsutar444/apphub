@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation";
+import { MainLayout } from "@/components/layout/main-layout";
+import { PageTransition } from "@/components/shared/page-transition";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-
-// ── Dummy payment gateway ─────────────────────────────────────────────────────
-// Payment is automatically marked as paid — no Razorpay, no UI, no questions.
-// Anyone who clicks "Publish App" becomes a developer instantly.
-// ─────────────────────────────────────────────────────────────────────────────
+import { UpiPaymentFlow } from "@/components/publish/upi-payment-flow";
 
 const ADMIN_EMAIL = "shubhamsutar81981@gmail.com";
 
@@ -14,54 +11,54 @@ export default async function PublishPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?redirectTo=/publish");
 
-  const supabase = await createClient();
-  const adminClient = createAdminClient();
+  // Admin bypasses payment entirely
+  if (user.email.toLowerCase() === ADMIN_EMAIL || user.profile.role === "admin") {
+    redirect("/dashboard/developer/apps/new");
+  }
 
-  // Check if developer profile already exists
+  const supabase = await createClient();
+
+  // Already a developer → go straight to submit
   const { data: existing } = await supabase
     .from("developers")
     .select("id")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (existing) {
-    // Already a developer → go straight to submit app
-    redirect("/dashboard/developer/apps/new");
-  }
+  if (existing) redirect("/dashboard/developer/apps/new");
 
-  // ── Create developer profile automatically ────────────────────────────
-  const slug =
-    (user.profile.full_name ?? user.email.split("@")[0])
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") +
-    "-" + Date.now().toString(36);
+  // Check if they already submitted a payment screenshot pending verification
+  const { data: pendingPayment } = await supabase
+    .from("payments")
+    .select("id, status, metadata")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  await adminClient.from("developers").insert({
-    user_id: user.id,
-    display_name: user.profile.full_name ?? user.email.split("@")[0],
-    slug,
-    support_email: user.email,
-  });
+  // Determine if it's their first time publishing
+  const { count } = await supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("status", "paid");
 
-  // ── Set role to developer (admin keeps admin role) ────────────────────
-  const isAdmin = user.email.toLowerCase() === ADMIN_EMAIL || user.profile.role === "admin";
-  if (!isAdmin) {
-    await adminClient
-      .from("users")
-      .update({ role: "developer" })
-      .eq("id", user.id);
-  }
+  const isFirstTime = (count ?? 0) === 0;
 
-  // ── Record ₹1 trial payment as paid (dummy) ───────────────────────────
-  await supabase.from("payments").insert({
-    user_id: user.id,
-    plan: "basic",
-    amount_paise: 100, // ₹1 trial plan
-    status: "paid",
-    metadata: { demo: true, plan_name: "₹1 Trial", auto_approved: true },
-  });
-
-  // ── Redirect directly to app submission ───────────────────────────────
-  redirect("/dashboard/developer/apps/new");
+  return (
+    <MainLayout>
+      <PageTransition>
+        <div className="section-container py-10 pb-24 md:pb-10">
+          <UpiPaymentFlow
+            userId={user.id}
+            userEmail={user.email}
+            userName={user.profile.full_name ?? user.email.split("@")[0]}
+            hasPendingPayment={!!pendingPayment}
+            isFirstTime={isFirstTime}
+          />
+        </div>
+      </PageTransition>
+    </MainLayout>
+  );
 }
