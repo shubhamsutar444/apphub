@@ -406,31 +406,58 @@ export function AppSubmissionForm({ categories, defaultPlan = "basic" }: AppSubm
 
       {/* ── Plan ──────────────────────────────────────────────────── */}
       <Card>
-        <h2 className="mb-2 font-heading text-lg font-semibold">Publishing Plan</h2>
-        <p className="mb-5 text-sm text-secondary-400">Select your listing tier</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="font-heading text-lg font-semibold">Publishing Plan</h2>
+            <p className="text-sm text-secondary-400">Select your preferred listing tier</p>
+          </div>
+          <a
+            href="/publish"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+          >
+            💳 Pay via UPI QR Code & Upload Proof →
+          </a>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-3">
           {PLANS.map((plan) => (
             <button
               key={plan.id}
               type="button"
               onClick={() => setSelectedPlan(plan.id)}
-              className={`rounded-2xl border p-5 text-left transition-all ${
+              className={`relative rounded-2xl border p-5 text-left transition-all ${
                 selectedPlan === plan.id
-                  ? "border-primary bg-primary/10 shadow-glow"
+                  ? "border-primary bg-primary/10 shadow-glow ring-1 ring-primary/30"
                   : "border-white/10 bg-white/3 hover:border-primary/25"
               }`}
             >
-              <p className="font-heading font-semibold">{plan.name}</p>
+              <div className="flex items-center justify-between">
+                <p className="font-heading font-semibold text-white">{plan.name}</p>
+                {selectedPlan === plan.id && (
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                )}
+              </div>
               <p className="mt-1 font-heading text-2xl font-bold text-primary">{plan.price}</p>
               <p className="mt-2 text-xs text-secondary-400">{plan.desc}</p>
             </button>
           ))}
         </div>
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <p className="text-xs text-secondary-300">
-            Payment was collected when you chose your publishing plan. Your app goes live after admin review.
-          </p>
+
+        <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p className="text-xs text-secondary-300">
+              Selected plan: <strong className="text-primary">{PLANS.find(p => p.id === selectedPlan)?.name} ({PLANS.find(p => p.id === selectedPlan)?.price})</strong>. Your app will be submitted under this plan.
+            </p>
+          </div>
+          <a
+            href="/publish"
+            className="shrink-0 rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/25 transition-colors"
+          >
+            Pay {PLANS.find(p => p.id === selectedPlan)?.price} via UPI
+          </a>
         </div>
       </Card>
 
