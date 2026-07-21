@@ -269,18 +269,18 @@ export function CategoriesSection({ categories }: { categories?: Category[] }) {
 export function PublishingPlansSection() {
   const plans = [
     {
-      name: "Trial",
+      name: "Starter",
       price: "₹1",
       period: "per app",
       highlight: true,
       active: true,
-      badge: "🎉 Active Now",
-      cta: "Start for ₹1",
+      badge: "🎉 First-Time Offer",
+      cta: "Choose Starter (₹1)",
       features: [
-        "Full standard listing",
+        "First-time publishers only",
+        "Standard listing",
         "24–72h review time",
         "App analytics",
-        "Community support",
         "Unlimited updates",
       ],
     },
@@ -289,9 +289,25 @@ export function PublishingPlansSection() {
       price: "₹99",
       period: "per app",
       highlight: false,
-      active: false,
-      badge: "Coming Soon",
-      cta: "Coming Soon",
+      active: true,
+      badge: "Standard",
+      cta: "Choose Basic (₹99)",
+      features: [
+        "Standard listing",
+        "24–72h review time",
+        "App analytics",
+        "Community support",
+        "Unlimited updates",
+      ],
+    },
+    {
+      name: "Priority",
+      price: "₹299",
+      period: "per app",
+      highlight: false,
+      active: true,
+      badge: "🔥 Popular",
+      cta: "Choose Priority (₹299)",
       features: [
         "Highlighted listing",
         "12–24h review time",
@@ -305,9 +321,9 @@ export function PublishingPlansSection() {
       price: "₹999",
       period: "per app",
       highlight: false,
-      active: false,
-      badge: "Coming Soon",
-      cta: "Coming Soon",
+      active: true,
+      badge: "⭐ Featured",
+      cta: "Choose Featured (₹999)",
       features: [
         "Homepage featured slot",
         "6–12h review time",
@@ -321,7 +337,7 @@ export function PublishingPlansSection() {
   return (
     <section className="section-container py-20">
       <SectionHeader title="Simple, Affordable Pricing" subtitle="Publish your app and reach thousands of users" />
-      <div className="grid gap-8 sm:grid-cols-3">
+      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan, i) => (
           <motion.div
             key={plan.name}
@@ -330,15 +346,15 @@ export function PublishingPlansSection() {
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
             className={`relative rounded-2xl p-6 transition-all ${
-              plan.active
+              plan.highlight
                 ? "border-2 border-primary bg-primary/5 shadow-glow"
-                : "border border-white/10 bg-night-900/40 opacity-60"
+                : "border border-white/10 bg-night-900/40 hover:border-primary/30"
             }`}
           >
             {plan.badge && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className={`rounded-full px-4 py-1 text-xs font-bold ${
-                  plan.active ? "bg-primary text-night-900" : "bg-secondary-700 text-secondary-300"
+                  plan.highlight ? "bg-primary text-night-900" : "bg-secondary-800 text-secondary-200 border border-white/10"
                 }`}>
                   {plan.badge}
                 </span>
@@ -346,7 +362,7 @@ export function PublishingPlansSection() {
             )}
             <h3 className="font-heading text-lg font-bold">{plan.name}</h3>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className={`font-heading text-4xl font-bold ${plan.active ? "text-primary" : "text-secondary-400"}`}>
+              <span className="font-heading text-4xl font-bold text-primary">
                 {plan.price}
               </span>
               <span className="text-sm text-secondary-400">{plan.period}</span>
@@ -354,21 +370,18 @@ export function PublishingPlansSection() {
             <ul className="my-6 space-y-2.5">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm text-secondary-300">
-                  <span className={plan.active ? "text-primary font-bold" : "text-secondary-600"}>✓</span> {f}
+                  <span className="text-primary font-bold">✓</span> {f}
                 </li>
               ))}
             </ul>
-            <Link href={plan.active ? "/submit-app" : "#"}>
-              <Button className="w-full" variant={plan.active ? "primary" : "secondary"} disabled={!plan.active}>
+            <Link href="/publish">
+              <Button className="w-full" variant={plan.highlight ? "primary" : "secondary"}>
                 {plan.cta}
               </Button>
             </Link>
           </motion.div>
         ))}
       </div>
-      <p className="mt-6 text-center text-sm text-secondary-500">
-        Priority and Featured plans coming soon. Currently all publishers get the ₹1 trial rate.
-      </p>
     </section>
   );
 }

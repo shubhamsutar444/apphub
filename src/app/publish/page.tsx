@@ -18,15 +18,6 @@ export default async function PublishPage() {
 
   const supabase = await createClient();
 
-  // Already a developer → go straight to submit
-  const { data: existing } = await supabase
-    .from("developers")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (existing) redirect("/dashboard/developer/apps/new");
-
   // Check if they already submitted a payment screenshot pending verification
   const { data: pendingPayment } = await supabase
     .from("payments")
