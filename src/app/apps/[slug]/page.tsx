@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { MainLayout } from "@/components/layout/main-layout";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/session";
 import { AppDetailClient } from "@/components/apps/app-detail-client";
 import { ScreenshotGallery } from "@/components/apps/screenshot-gallery";
@@ -22,13 +23,13 @@ interface AppPageProps {
 
 export async function generateMetadata({ params }: AppPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: app } = await supabase
+  const adminClient = createAdminClient();
+  const { data: app } = await adminClient
     .from("applications")
     .select("name, short_description, icon_url, banner_url, rating_avg, download_count")
     .eq("slug", slug)
-    .eq("status", "approved")
-    .single();
+    .maybeSingle();
+
   if (!app) return { title: "App Not Found" };
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://apphub-k384-git-main-shubhamsutar444s-projects.vercel.app";
   const pageUrl = `${appUrl}/apps/${slug}`;
@@ -64,26 +65,33 @@ function formatDate(dateStr: string): string {
 
 export default async function AppDetailPage({ params }: AppPageProps) {
   const { slug } = await params;
-  const supabase = await createClient();
+  const adminClient = createAdminClient();
+  const user = await getCurrentUser();
 
-  const { data: app } = await supabase
+  const { data: app } = await adminClient
     .from("applications")
     .select("*, categories:category_id(*), developers:developer_id(*)")
     .eq("slug", slug)
-    .eq("status", "approved")
-    .single();
+    .maybeSingle();
 
   if (!app) notFound();
 
   const typedApp = app as unknown as Application;
-  const dev = typedApp.developers as { display_name: string; slug: string; is_verified: boolean } | null;
+  const dev = typedApp.developers as { id: string; user_id: string; display_name: string; slug: string; is_verified: boolean } | null;
   const cat = typedApp.categories as { name: string } | null;
 
-  const [{ data: versions }, { data: screenshots }, { data: reviews }, user] = await Promise.all([
-    supabase.from("application_versions").select("*").eq("application_id", typedApp.id).eq("is_active", true).order("created_at", { ascending: false }),
-    supabase.from("application_screenshots").select("*").eq("application_id", typedApp.id).order("sort_order"),
+  // Security check: if app is not yet approved, only developer owner or admin can view preview
+  const isOwnerOrAdmin = user && (user.profile.role === "admin" || dev?.user_id === user.id);
+  if (typedApp.status !== "approved" && !isOwnerOrAdmin) {
+    notFound();
+  }
+
+  const supabase = await createClient();
+
+  const [{ data: versions }, { data: screenshots }, { data: reviews }] = await Promise.all([
+    adminClient.from("application_versions").select("*").eq("application_id", typedApp.id).eq("is_active", true).order("created_at", { ascending: false }),
+    adminClient.from("application_screenshots").select("*").eq("application_id", typedApp.id).order("sort_order"),
     supabase.from("reviews").select("*, users:user_id(full_name, avatar_url)").eq("application_id", typedApp.id).order("created_at", { ascending: false }).limit(10),
-    getCurrentUser(),
   ]);
 
   const latestVersion = versions?.[0] as ApplicationVersion | undefined;

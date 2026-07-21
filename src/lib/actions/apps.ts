@@ -98,7 +98,9 @@ export async function submitAppAction(
     published_at: isAdmin ? new Date().toISOString() : null,
   };
 
-  let { data: app, error } = await supabase
+  const adminClient = createAdminClient();
+
+  let { data: app, error } = await adminClient
     .from("applications")
     .insert(insertPayload)
     .select("id")
@@ -106,7 +108,7 @@ export async function submitAppAction(
 
   if (error && error.message?.includes("package_name")) {
     delete insertPayload.package_name;
-    const retry = await supabase
+    const retry = await adminClient
       .from("applications")
       .insert(insertPayload)
       .select("id")
@@ -121,7 +123,7 @@ export async function submitAppAction(
 
   // Save APK version record
   if (apkUrl) {
-    await supabase.from("application_versions").insert({
+    await adminClient.from("application_versions").insert({
       application_id: app.id,
       version: parsed.data.version,
       apk_path: apkUrl,
@@ -132,7 +134,7 @@ export async function submitAppAction(
 
   // Save screenshots
   if (screenshotUrls.length > 0) {
-    await supabase.from("application_screenshots").insert(
+    await adminClient.from("application_screenshots").insert(
       screenshotUrls.map((url, i) => ({
         application_id: app.id,
         url,
@@ -155,7 +157,7 @@ export async function submitAppAction(
     };
     const amountPaise = rawAmountPaise || defaultPlanPrices[chosenPlan] || 9900;
 
-    await supabase.from("payments").insert({
+    await adminClient.from("payments").insert({
       user_id: user.id,
       application_id: app.id,
       plan: chosenPlan,
@@ -167,7 +169,6 @@ export async function submitAppAction(
     });
 
     // Notify admins about new submission
-    const adminClient = createAdminClient();
     const { data: admins } = await adminClient
       .from("users")
       .select("id")
