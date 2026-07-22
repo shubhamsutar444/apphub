@@ -328,21 +328,30 @@ export async function updateAppAction(
 
   // Save new APK version if uploaded
   if (newApkUrl) {
-    const versionString = parsed.data.version || newApkVersion || "1.0.0";
+    const versionString = (parsed.data.version || newApkVersion || "1.0.0").trim();
 
-    // Deactivate old versions
+    // Delete ALL old versions for this app (not just deactivate)
+    // This avoids UNIQUE constraint conflicts on re-upload with same version number
     await adminClient
       .from("application_versions")
-      .update({ is_active: false })
+      .delete()
       .eq("application_id", appId);
 
-    await adminClient.from("application_versions").insert({
-      application_id: appId,
-      version: versionString,
-      apk_path: newApkUrl,
-      apk_size_bytes: 0,
-      is_active: true,
-    });
+    // Insert new active version
+    const { error: versionError } = await adminClient
+      .from("application_versions")
+      .insert({
+        application_id: appId,
+        version: versionString,
+        apk_path: newApkUrl,
+        apk_size_bytes: 0,
+        is_active: true,
+      });
+
+    // Log error but don't fail the whole update
+    if (versionError) {
+      console.error("APK version insert error:", versionError.message);
+    }
   }
 
   // Replace screenshots if new ones were provided
