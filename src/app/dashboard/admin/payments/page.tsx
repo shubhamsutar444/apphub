@@ -114,6 +114,7 @@ export default async function AdminPaymentsPage() {
                       <AdminPaymentApprove
                         paymentId={p.id}
                         targetUserId={p.user_id}
+                        userName={userName}
                       />
                     </div>
                   </Card>
